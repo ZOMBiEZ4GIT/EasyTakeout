@@ -1703,7 +1703,7 @@ class App(QWidget):
 
         # Right Panel - Progress & Activity
         right_panel = QVBoxLayout()
-        right_panel.setSpacing(20)
+        right_panel.setSpacing(15)
         
         # Progress card
         progress_card = ModernCard("📊 Progress Dashboard")
@@ -1783,7 +1783,7 @@ class App(QWidget):
         
         # Stats cards row
         stats_layout = QHBoxLayout()
-        stats_layout.setSpacing(15)
+        stats_layout.setSpacing(12)
         
         self.stats_completed = ModernStatsCard("Completed", "0", "✅")
         self.stats_failed = ModernStatsCard("Failed", "0", "❌")
@@ -1797,20 +1797,19 @@ class App(QWidget):
         
         # Remaining files row
         remaining_layout = QHBoxLayout()
-        remaining_layout.setSpacing(15)
+        remaining_layout.setSpacing(12)
         
         self.stats_images = ModernStatsCard("Images Left", "0", "🖼️")
         self.stats_videos = ModernStatsCard("Videos Left", "0", "🎬")
         
         remaining_layout.addWidget(self.stats_images)
         remaining_layout.addWidget(self.stats_videos)
-        remaining_layout.addStretch()
         
         right_panel.addLayout(remaining_layout)
         
         # Output folder cards
         output_cards_layout = QHBoxLayout()
-        output_cards_layout.setSpacing(15)
+        output_cards_layout.setSpacing(12)
         
         self.completed_folder_card = OutputFolderCard("Completed Files", "✅")
         self.failed_folder_card = OutputFolderCard("Failed Files", "❌")
