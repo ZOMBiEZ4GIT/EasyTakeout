@@ -352,10 +352,12 @@ class ModernDropZone(QFrame):
 class CircularProgress(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumSize(120, 120)
+        self.setMinimumSize(140, 140)
         self.progress = 0
-        self.text = "0%"
+        self.percentage_text = "0%"
+        self.sublabel_text = ""
         self._progress_value = 0  # Initialize this first
+        self.processing_rate = 0  # Files per second for color calculation
         
         # Animation for smooth progress updates
         self.progress_animation = QPropertyAnimation(self, b"progress_value")
@@ -372,9 +374,19 @@ class CircularProgress(QWidget):
         
     progress_value = Property(float, get_progress_value, set_progress_value)
         
-    def set_progress(self, value, text=""):
+    def set_progress(self, value, processed_count=0, total_count=0, rate=0):
+        """Enhanced progress setter with separate percentage and count display"""
         new_progress = max(0, min(100, value))
-        self.text = text or f"{int(new_progress)}%"
+        self.percentage_text = f"{int(new_progress)}%"
+        
+        # Set sublabel with X of Y format
+        if total_count > 0:
+            self.sublabel_text = f"{processed_count} of {total_count}"
+        else:
+            self.sublabel_text = ""
+            
+        # Store processing rate for color calculation
+        self.processing_rate = rate
         
         # Animate to new progress value
         self.progress_animation.stop()
@@ -384,23 +396,47 @@ class CircularProgress(QWidget):
         
         self.progress = new_progress
         
+    def _get_progress_color(self):
+        """Get color based on progress and processing speed"""
+        if self.processing_rate <= 0:
+            return QColor("#00d4aa")  # Default green
+        elif self.processing_rate > 2.0:  # Fast processing
+            return QColor("#00d4aa")  # Green
+        elif self.processing_rate > 0.5:  # Medium speed
+            return QColor("#ffa500")  # Orange
+        else:  # Slow processing
+            return QColor("#ff6b6b")  # Red
+        
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         
         # Background circle
-        painter.setPen(QPen(QColor("#333333"), 8))
-        painter.drawEllipse(10, 10, 100, 100)
+        painter.setPen(QPen(QColor("#333333"), 10))
+        painter.drawEllipse(15, 15, 110, 110)
         
-        # Progress arc with gradient effect
-        painter.setPen(QPen(QColor("#00d4aa"), 8))
+        # Progress arc with dynamic color
+        progress_color = self._get_progress_color()
+        painter.setPen(QPen(progress_color, 10))
         span_angle = int(self._progress_value * 360 / 100)
-        painter.drawArc(10, 10, 100, 100, 90 * 16, -span_angle * 16)
+        painter.drawArc(15, 15, 110, 110, 90 * 16, -span_angle * 16)
         
-        # Center text
+        # Center percentage text
         painter.setPen(QColor("white"))
-        painter.setFont(QFont("Arial", 14, QFont.Bold))
-        painter.drawText(self.rect(), Qt.AlignCenter, self.text)
+        painter.setFont(QFont("Arial", 18, QFont.Bold))
+        
+        # Calculate text position for percentage
+        text_rect = self.rect()
+        text_rect.moveTop(text_rect.top() + 35)  # Move up slightly for percentage
+        painter.drawText(text_rect, Qt.AlignCenter, self.percentage_text)
+        
+        # Sublabel text (X of Y)
+        if self.sublabel_text:
+            painter.setFont(QFont("Arial", 10, QFont.Normal))
+            painter.setPen(QColor("#aaaaaa"))
+            sublabel_rect = self.rect()
+            sublabel_rect.moveTop(sublabel_rect.top() + 85)  # Position below percentage
+            painter.drawText(sublabel_rect, Qt.AlignCenter, self.sublabel_text)
 
 class ModernToggle(QCheckBox):
     def __init__(self, text="", parent=None):
@@ -476,6 +512,126 @@ class ModernStatsCard(ModernCard):
         
     def update_value(self, value):
         self.value_label.setText(str(value))
+
+class OutputFolderCard(ModernCard):
+    def __init__(self, title, icon, path="", parent=None):
+        super().__init__(parent=parent)
+        self.folder_path = path
+        
+        layout = QVBoxLayout()
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(8)
+        
+        # Header with icon and title
+        header_layout = QHBoxLayout()
+        
+        icon_label = QLabel(icon)
+        icon_label.setStyleSheet("font-size: 20px;")
+        icon_label.setFixedSize(30, 30)
+        icon_label.setAlignment(Qt.AlignCenter)
+        
+        title_label = QLabel(title)
+        title_label.setStyleSheet("""
+            font-size: 14px;
+            font-weight: 600;
+            color: #ffffff;
+        """)
+        
+        header_layout.addWidget(icon_label)
+        header_layout.addWidget(title_label)
+        header_layout.addStretch()
+        
+        # Count display
+        self.count_label = QLabel("0")
+        self.count_label.setStyleSheet("""
+            font-size: 18px;
+            font-weight: 700;
+            color: #00d4aa;
+            background-color: rgba(0, 212, 170, 0.1);
+            border-radius: 12px;
+            padding: 4px 8px;
+            margin: 5px 0;
+        """)
+        self.count_label.setAlignment(Qt.AlignCenter)
+        
+        # Open button
+        self.open_btn = ModernButton("📂 Open Folder", "secondary")
+        self.open_btn.setMaximumHeight(35)
+        self.open_btn.clicked.connect(self.open_folder)
+        self.open_btn.setEnabled(False)  # Disabled until path is set
+        
+        layout.addLayout(header_layout)
+        layout.addWidget(self.count_label)
+        layout.addWidget(self.open_btn)
+        
+        self.setLayout(layout)
+        self.setFixedHeight(120)
+        
+        # Add hover effect
+        self.setStyleSheet("""
+            OutputFolderCard {
+                background-color: #2d2d2d;
+                border-radius: 12px;
+                border: 1px solid #3d3d3d;
+            }
+            OutputFolderCard:hover {
+                border: 1px solid #00d4aa;
+                background-color: #323232;
+                transform: translateY(-2px);
+            }
+        """)
+        
+    def set_path(self, path: str):
+        """Set the folder path and enable the open button"""
+        self.folder_path = path
+        self.open_btn.setEnabled(bool(path))
+        
+    def update_count(self, count: int):
+        """Update the count display"""
+        self.count_label.setText(str(count))
+        
+        # Add visual feedback for non-zero counts
+        if count > 0:
+            self.count_label.setStyleSheet("""
+                font-size: 18px;
+                font-weight: 700;
+                color: #ffffff;
+                background-color: #00d4aa;
+                border-radius: 12px;
+                padding: 4px 8px;
+                margin: 5px 0;
+            """)
+        else:
+            self.count_label.setStyleSheet("""
+                font-size: 18px;
+                font-weight: 700;
+                color: #00d4aa;
+                background-color: rgba(0, 212, 170, 0.1);
+                border-radius: 12px;
+                padding: 4px 8px;
+                margin: 5px 0;
+            """)
+    
+    def open_folder(self):
+        """Open the folder in the system file explorer"""
+        if self.folder_path and Path(self.folder_path).exists():
+            import subprocess
+            import sys
+            
+            try:
+                if sys.platform == "win32":
+                    subprocess.run(["explorer", str(Path(self.folder_path))], check=True)
+                elif sys.platform == "darwin":
+                    subprocess.run(["open", str(Path(self.folder_path))], check=True)
+                else:
+                    subprocess.run(["xdg-open", str(Path(self.folder_path))], check=True)
+            except Exception as e:
+                # Fallback: show message with path
+                QMessageBox.information(self, "Folder Path", 
+                                      f"Folder location:\n{self.folder_path}")
+        else:
+            QMessageBox.warning(self, "Folder Not Found", 
+                              "The output folder doesn't exist yet or path is not set.")
 
 # ---------- Plan summary dialog ----------
 class PlanSummaryDialog(QDialog):
@@ -1289,12 +1445,14 @@ class App(QWidget):
         controls_layout = QHBoxLayout()
         controls_layout.setSpacing(15)
         
-        self.btn_start = ModernButton("🚀 Start Processing", "primary")
+        self.btn_start = ModernButton("▶️ Start Processing", "primary")
         self.btn_pause = ModernButton("⏸️ Pause", "secondary")
         self.btn_stop = ModernButton("⏹️ Stop", "danger")
         
+        # Enhanced visual states for pause button
         self.btn_pause.setEnabled(False)
         self.btn_stop.setEnabled(False)
+        self._update_pause_button_style(enabled=False)
         
         self.btn_start.clicked.connect(self.on_start)
         self.btn_pause.clicked.connect(self.on_pause_toggle)
@@ -1388,6 +1546,20 @@ class App(QWidget):
         remaining_layout.addStretch()
         
         right_panel.addLayout(remaining_layout)
+        
+        # Output folder cards
+        output_cards_layout = QHBoxLayout()
+        output_cards_layout.setSpacing(15)
+        
+        self.completed_folder_card = OutputFolderCard("Completed Files", "✅")
+        self.failed_folder_card = OutputFolderCard("Failed Files", "❌")
+        self.logs_folder_card = OutputFolderCard("Logs & Reports", "📝")
+        
+        output_cards_layout.addWidget(self.completed_folder_card)
+        output_cards_layout.addWidget(self.failed_folder_card)
+        output_cards_layout.addWidget(self.logs_folder_card)
+        
+        right_panel.addLayout(output_cards_layout)
 
         # Now Processing card
         processing_card = ModernCard("⚡ Live Processing")
@@ -1455,12 +1627,41 @@ class App(QWidget):
         processing_card.layout.addLayout(processing_layout)
         right_panel.addWidget(processing_card)
 
-        # Full log window
-        log_card = ModernCard("📜 Detailed Log")
+        # Collapsible detailed log window
+        log_card = ModernCard()
+        log_layout = QVBoxLayout()
+        
+        # Log header with toggle button
+        log_header = QHBoxLayout()
+        log_title = QLabel("📜 Detailed Log")
+        log_title.setStyleSheet("""
+            font-size: 16px;
+            font-weight: 600;
+            color: #ffffff;
+        """)
+        
+        self.log_toggle_btn = ModernButton("Hide Details", "secondary")
+        self.log_toggle_btn.setMaximumWidth(120)
+        self.log_toggle_btn.clicked.connect(self.toggle_detailed_log)
+        
+        log_header.addWidget(log_title)
+        log_header.addStretch()
+        log_header.addWidget(self.log_toggle_btn)
+        
+        # Log text area
         self.log = QTextEdit()
         self.log.setReadOnly(True)
         self.log.setPlaceholderText("Detailed processing log will appear here...")
-        log_card.layout.addWidget(self.log)
+        self.log.setMinimumHeight(200)
+        
+        # Start with log collapsed by default
+        self.log.hide()
+        self.log_toggle_btn.setText("Show Details")
+        
+        log_layout.addLayout(log_header)
+        log_layout.addWidget(self.log)
+        
+        log_card.layout.addLayout(log_layout)
         right_panel.addWidget(log_card, 1)  # This gets most of the space
         
         # Tip
@@ -1498,7 +1699,87 @@ class App(QWidget):
 
     # ---- UI helpers ----
     def set_thumb(self, path: str, caption: str):
-        self.thumb_caption.setText(caption or "Ready to process files")
+        """Enhanced thumbnail display with file information"""
+        # Extract filename from caption for file info lookup
+        filename = caption or "Ready to process files"
+        
+        # Get file info if path exists
+        file_info = ""
+        if path and Path(path).exists():
+            try:
+                # Get original media file path from thumbnail path
+                # Thumbnail names are hashed, so we'll get info from the caption filename
+                if caption and caption != "Ready to process files":
+                    # Look for the actual file in the source directory if available
+                    source_path = None
+                    if hasattr(self, 'worker') and self.worker and hasattr(self.worker, 'source'):
+                        # Try to find the actual file
+                        from pathlib import Path
+                        for media_file in Path(self.worker.source).rglob(caption):
+                            if media_file.is_file():
+                                source_path = media_file
+                                break
+                    
+                    if source_path and source_path.exists():
+                        # Get file size
+                        size_bytes = source_path.stat().st_size
+                        if size_bytes < 1024:
+                            size_str = f"{size_bytes} B"
+                        elif size_bytes < 1024 * 1024:
+                            size_str = f"{size_bytes / 1024:.1f} KB"
+                        else:
+                            size_str = f"{size_bytes / (1024 * 1024):.1f} MB"
+                        
+                        # Get dimensions if it's an image
+                        dimensions_str = ""
+                        if is_image_file(source_path):
+                            try:
+                                from PIL import Image
+                                with Image.open(source_path) as img:
+                                    dimensions_str = f"{img.width}×{img.height}"
+                            except:
+                                dimensions_str = "Unknown size"
+                        elif is_video_file(source_path):
+                            # Try to get video dimensions with ffprobe if available
+                            try:
+                                if hasattr(self, 'worker') and self.worker and self.worker.ffmpeg:
+                                    import subprocess
+                                    ffprobe_cmd = [
+                                        self.worker.ffmpeg.replace('ffmpeg', 'ffprobe'),
+                                        '-v', 'quiet', '-print_format', 'json',
+                                        '-show_streams', str(source_path)
+                                    ]
+                                    result = subprocess.run(ffprobe_cmd, capture_output=True, text=True, timeout=5)
+                                    if result.returncode == 0:
+                                        import json
+                                        data = json.loads(result.stdout)
+                                        for stream in data.get('streams', []):
+                                            if stream.get('codec_type') == 'video':
+                                                w, h = stream.get('width', 0), stream.get('height', 0)
+                                                if w and h:
+                                                    dimensions_str = f"{w}×{h}"
+                                                break
+                            except:
+                                pass
+                            if not dimensions_str:
+                                dimensions_str = "Video"
+                        
+                        # Combine dimensions and size
+                        if dimensions_str:
+                            file_info = f"{dimensions_str} · {size_str}"
+                        else:
+                            file_info = size_str
+                            
+            except Exception as e:
+                file_info = ""
+        
+        # Update caption with file info
+        display_caption = filename
+        if file_info:
+            display_caption = f"{filename}\n{file_info}"
+        
+        self.thumb_caption.setText(display_caption)
+        
         if path and Path(path).exists():
             pm = QPixmap(path)
             if not pm.isNull():
@@ -1521,19 +1802,56 @@ class App(QWidget):
         """)
 
     def append_log(self, line: str):
-        self.log.append(line)
-        # also tee into the Now Processing activity stream (keep it lively)
-        self.activity_stream.append(line)
+        """Enhanced log append with color coding"""
+        # Color code the log line based on content
+        colored_line = self._colorize_log_line(line)
+        
+        self.log.append(colored_line)
+        
+        # Also add to activity stream with simpler formatting for casual viewing
+        activity_line = self._simplify_for_activity(line)
+        self.activity_stream.append(activity_line)
+        
         # Auto-scroll to bottom with smooth animation
         QTimer.singleShot(50, lambda: self.log.verticalScrollBar().setValue(
             self.log.verticalScrollBar().maximum()))
         QTimer.singleShot(50, lambda: self.activity_stream.verticalScrollBar().setValue(
             self.activity_stream.verticalScrollBar().maximum()))
+    
+    def _colorize_log_line(self, line: str) -> str:
+        """Add HTML color coding to log lines based on content"""
+        line_lower = line.lower()
+        
+        if any(word in line_lower for word in ['error', 'fail', 'fatal', '❌']):
+            return f'<span style="color: #ff6b6b;">{line}</span>'
+        elif any(word in line_lower for word in ['warn', 'warning', '⚠️']):
+            return f'<span style="color: #ffa500;">{line}</span>'
+        elif any(word in line_lower for word in ['ok:', 'completed', 'success', '✅', '✨']):
+            return f'<span style="color: #00d4aa;">{line}</span>'
+        elif line.startswith('DEBUG:'):
+            return f'<span style="color: #888888;">{line}</span>'
+        else:
+            return f'<span style="color: #ffffff;">{line}</span>'
+    
+    def _simplify_for_activity(self, line: str) -> str:
+        """Simplify log lines for the activity stream"""
+        # Remove timestamp for cleaner activity view
+        if line.startswith('[') and ']' in line:
+            # Extract just the message part after timestamp
+            parts = line.split(']', 1)
+            if len(parts) > 1:
+                simplified = parts[1].strip()
+                return self._colorize_log_line(simplified)
+        return self._colorize_log_line(line)
 
     def set_counts(self, ok, fail, warn): 
         self.stats_completed.update_value(ok)
         self.stats_failed.update_value(fail)
         self.stats_warnings.update_value(warn)
+        
+        # Also update output folder cards
+        self.completed_folder_card.update_count(ok)
+        self.failed_folder_card.update_count(fail)
         
     def set_remaining(self, img, vid): 
         self.stats_images.update_value(img)
@@ -1555,11 +1873,16 @@ class App(QWidget):
         # Ensure default folders exist
         for p in [ok, fl, lg]:
             ensure_dir(Path(p))
+        
+        # Update output folder cards with paths
+        self.completed_folder_card.set_path(ok)
+        self.failed_folder_card.set_path(fl)
+        self.logs_folder_card.set_path(lg)
 
         # Clear UI
         self.log.clear(); self.activity_stream.clear()
         self.prog.setValue(0); self.set_counts(0,0,0); self.set_remaining(0,0)
-        self.circular_progress.set_progress(0, "Starting...")
+        self.circular_progress.set_progress(0, 0, 0, 0)
         
         # Update stage
         self.lbl_stage.setText("🗒️ Planning Stage")
@@ -1567,6 +1890,7 @@ class App(QWidget):
         self.btn_pause.setEnabled(True)
         self.btn_stop.setEnabled(True)
         self.btn_pause.setText("⏸️ Pause")
+        self._update_pause_button_style(enabled=True)
 
         self.worker = Orchestrator(
             src, ok, fl, lg,
@@ -1597,11 +1921,30 @@ class App(QWidget):
             self.btn_pause.setText("▶️ Resume")
             self.lbl_stage.setText("⏸️ Paused")
             self.append_log("[UI] Processing paused")
+            # Update button style to resume state
+            self.btn_pause.setStyleSheet("""
+                ModernButton {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #4CAF50, stop:1 #45a049);
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 600;
+                    padding: 12px 24px;
+                }
+                ModernButton:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #66BB6A, stop:1 #4CAF50);
+                }
+            """)
         else:
             self.worker.toggle_pause(False)
             self.btn_pause.setText("⏸️ Pause")
             self.lbl_stage.setText("▶️ Resuming...")
             self.append_log("[UI] Processing resumed")
+            # Restore normal pause button style
+            self._update_pause_button_style(enabled=True)
 
     def on_stop(self):
         if self.worker:
@@ -1611,12 +1954,25 @@ class App(QWidget):
         self.btn_pause.setEnabled(False)
         self.btn_stop.setEnabled(False)
         self.btn_start.setEnabled(True)
+        self._update_pause_button_style(enabled=False)
 
     # ---- Slots ----
     def on_progress(self, processed, total):
         pct = int((processed/total)*100) if total else 0
         self.prog.setValue(pct)
-        self.circular_progress.set_progress(pct, f"{processed}/{total}")
+        
+        # Calculate processing rate from substage text if available
+        rate = 0
+        substage_text = self.lbl_substage.text()
+        if "files/s" in substage_text:
+            try:
+                # Extract rate from substage text like "Mapping… 150/1000 | 2.5 files/s"
+                rate_part = substage_text.split("files/s")[0].split()[-1]
+                rate = float(rate_part)
+            except:
+                rate = 0
+        
+        self.circular_progress.set_progress(pct, processed, total, rate)
 
     def on_thumb(self, path, caption): 
         self.set_thumb(path, caption)
@@ -1628,7 +1984,7 @@ class App(QWidget):
                                 summary.get("live_pairs",0), size_gb)
         
         # Update progress to show planning complete
-        self.circular_progress.set_progress(100, "Plan Complete")
+        self.circular_progress.set_progress(100, summary.get("with_json",0) + summary.get("without_json",0), summary.get("with_json",0) + summary.get("without_json",0), 0)
         self.lbl_stage.setText("✅ Planning Complete")
         
         if dlg.exec() != QDialog.Accepted:
@@ -1639,12 +1995,12 @@ class App(QWidget):
             self.btn_stop.setEnabled(False)
             self.btn_start.setEnabled(True)
             self.lbl_stage.setText("🔄 Ready to Start")
-            self.circular_progress.set_progress(0, "Ready")
+            self.circular_progress.set_progress(0, 0, 0, 0)
         else:
             self.append_log("[UI] Starting merge stage...")
             self.worker.toggle_pause(False)
             self.lbl_stage.setText("⚙️ Merging Files")
-            self.circular_progress.set_progress(0, "Merging...")
+            self.circular_progress.set_progress(0, 0, 0, 0)
 
     def on_finished(self, report_csv, log_path):
         self.append_log("✨ === Processing Complete! ===")
@@ -1652,7 +2008,11 @@ class App(QWidget):
         self.append_log(f"📝 Log file: {log_path}")
         
         # Update UI to finished state
-        self.circular_progress.set_progress(100, "Complete!")
+        # Get current counts from the stats cards
+        completed_count = int(self.stats_completed.value_label.text())
+        failed_count = int(self.stats_failed.value_label.text())
+        total_processed = completed_count + failed_count
+        self.circular_progress.set_progress(100, total_processed, total_processed, 0)
         self.lbl_stage.setText("✨ All Done!")
         self.lbl_substage.setText("Processing completed successfully")
         
@@ -1660,20 +2020,72 @@ class App(QWidget):
         self.btn_pause.setEnabled(False)
         self.btn_stop.setEnabled(False)
         self.btn_start.setEnabled(True)
+        self._update_pause_button_style(enabled=False)
         self.btn_pause.setText("⏸️ Pause")
+        self._update_pause_button_style(enabled=False)
 
     def on_fatal(self, msg):
         self.append_log(f"❌ FATAL ERROR: {msg}")
         QMessageBox.critical(self, "❌ Fatal Error", msg)
         
         # Reset UI to error state
-        self.circular_progress.set_progress(0, "Error")
+        self.circular_progress.set_progress(0, 0, 0, 0)
         self.lbl_stage.setText("❌ Error Occurred")
         self.lbl_substage.setText("Check log for details")
         
         self.btn_pause.setEnabled(False)
         self.btn_stop.setEnabled(False)
         self.btn_start.setEnabled(True)
+        self._update_pause_button_style(enabled=False)
+    
+    def toggle_detailed_log(self):
+        """Toggle the detailed log visibility"""
+        if self.log.isVisible():
+            self.log.hide()
+            self.log_toggle_btn.setText("Show Details")
+        else:
+            self.log.show()
+            self.log_toggle_btn.setText("Hide Details")
+    
+    def _update_pause_button_style(self, enabled: bool):
+        """Update pause button visual style based on enabled state"""
+        if enabled:
+            self.btn_pause.setStyleSheet("""
+                ModernButton {
+                    background: transparent;
+                    color: #ffffff;
+                    border: 2px solid #00d4aa;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    padding: 10px 20px;
+                }
+                ModernButton:hover {
+                    background: rgba(0, 212, 170, 0.1);
+                    border-color: #00e6c0;
+                }
+                ModernButton:pressed {
+                    background: rgba(0, 212, 170, 0.2);
+                }
+            """)
+        else:
+            # Disabled/grayed out style
+            self.btn_pause.setStyleSheet("""
+                ModernButton {
+                    background: transparent;
+                    color: #555555;
+                    border: 2px solid #444444;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    padding: 10px 20px;
+                }
+                ModernButton:disabled {
+                    background: transparent;
+                    color: #555555;
+                    border: 2px solid #444444;
+                }
+            """)
 
 def main():
     app = QApplication(sys.argv)
