@@ -358,6 +358,7 @@ class CircularProgress(QWidget):
         self.sublabel_text = ""
         self._progress_value = 0  # Initialize this first
         self.processing_rate = 0  # Files per second for color calculation
+        self.dry_run_mode = False  # For blue theme
         
         # Animation for smooth progress updates
         self.progress_animation = QPropertyAnimation(self, b"progress_value")
@@ -374,18 +375,30 @@ class CircularProgress(QWidget):
         
     progress_value = Property(float, get_progress_value, set_progress_value)
         
-    def set_progress(self, value, processed_count=0, total_count=0, rate=0):
-        """Enhanced progress setter with separate percentage and count display"""
+    def set_progress(self, value, processed_count=0, total_count=0, rate=0, avg_rate=0, stage_elapsed=None):
+        """Enhanced progress setter with average rate and stage timing"""
         new_progress = max(0, min(100, value))
         self.percentage_text = f"{int(new_progress)}%"
         
-        # Set sublabel with X of Y format
+        # Enhanced sublabel with rate information
         if total_count > 0:
-            self.sublabel_text = f"{processed_count} of {total_count}"
+            rate_text = ""
+            if rate > 0 or avg_rate > 0:
+                if avg_rate > 0:
+                    rate_text = f" • {rate:.1f}/{avg_rate:.1f} files/s"
+                else:
+                    rate_text = f" • {rate:.1f} files/s"
+            
+            stage_text = ""
+            if stage_elapsed:
+                mins, secs = divmod(int(stage_elapsed), 60)
+                stage_text = f" • {mins:02d}:{secs:02d}"
+            
+            self.sublabel_text = f"{processed_count} of {total_count}{rate_text}{stage_text}"
         else:
             self.sublabel_text = ""
             
-        # Store processing rate for color calculation
+        # Store processing rate for color calculation (use current rate for stall detection)
         self.processing_rate = rate
         
         # Animate to new progress value
@@ -398,14 +411,26 @@ class CircularProgress(QWidget):
         
     def _get_progress_color(self):
         """Get color based on progress and processing speed"""
-        if self.processing_rate <= 0:
-            return QColor("#00d4aa")  # Default green
-        elif self.processing_rate > 2.0:  # Fast processing
-            return QColor("#00d4aa")  # Green
-        elif self.processing_rate > 0.5:  # Medium speed
-            return QColor("#ffa500")  # Orange
-        else:  # Slow processing
-            return QColor("#ff6b6b")  # Red
+        if self.dry_run_mode:
+            # Blue theme for dry run mode
+            if self.processing_rate <= 0:
+                return QColor("#36a2eb")  # Default blue
+            elif self.processing_rate > 2.0:  # Fast processing
+                return QColor("#36a2eb")  # Blue
+            elif self.processing_rate > 0.5:  # Medium speed
+                return QColor("#87ceeb")  # Light blue
+            else:  # Slow processing
+                return QColor("#4682b4")  # Steel blue
+        else:
+            # Normal green theme
+            if self.processing_rate <= 0:
+                return QColor("#00d4aa")  # Default green
+            elif self.processing_rate > 2.0:  # Fast processing
+                return QColor("#00d4aa")  # Green
+            elif self.processing_rate > 0.5:  # Medium speed
+                return QColor("#ffa500")  # Orange
+            else:  # Slow processing
+                return QColor("#ff6b6b")  # Red
         
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -666,6 +691,7 @@ class Orchestrator(QThread):
     thumb = Signal(str, str)                  # path, caption
     finished_files = Signal(str, str)         # report_csv, log_path
     need_user_confirm = Signal(dict)          # emitted after planning
+    failure_summary = Signal(dict)            # failure reason counts
     fatal = Signal(str)
 
     def __init__(self, source, completed, failed, logs, preserve_tree, overwrite, dry_run, exiftool, ffmpeg):
@@ -685,6 +711,18 @@ class Orchestrator(QThread):
         # logging
         self.log_file = None
         self.log_file_path = None
+        # enhanced tracking
+        self.stage_start_time = None
+        self.rate_history = []  # For calculating average rate
+        self.current_stage = "Ready"
+        # failure tracking
+        self.failure_reasons = {
+            "no_json": 0,
+            "bad_json": 0,
+            "exiftool_error": 0,
+            "partner_error": 0,
+            "other_error": 0
+        }
 
     # public controls
     def request_stop(self): self._stop = True
@@ -744,8 +782,30 @@ class Orchestrator(QThread):
                 # Fallback: just emit to UI if file write fails
                 self.status.emit(f"[ERROR] Log write failed: {e}")
 
+    def _start_stage(self, stage_name: str):
+        """Start tracking a new stage"""
+        self.current_stage = stage_name
+        self.stage_start_time = time.time()
+        self.rate_history.clear()
+        self.log(f"Starting stage: {stage_name}")
+
+    def _calculate_average_rate(self, current_rate: float) -> float:
+        """Calculate rolling average rate"""
+        self.rate_history.append(current_rate)
+        # Keep only last 10 measurements for rolling average
+        if len(self.rate_history) > 10:
+            self.rate_history.pop(0)
+        return sum(self.rate_history) / len(self.rate_history) if self.rate_history else 0
+
+    def _get_stage_elapsed(self) -> Optional[float]:
+        """Get elapsed time for current stage"""
+        if self.stage_start_time:
+            return time.time() - self.stage_start_time
+        return None
+
     # -------- Stage 1: Plan (three-pass with explicit subfolder inventory) --------
     def stage_plan(self):
+        self._start_stage("Planning")
         self.stage.emit("Planning…")
         src = self.source
         if not src.exists():
@@ -994,6 +1054,8 @@ class Orchestrator(QThread):
                     now = time.time()
                     if (processed % 100 == 0) or (now - last_ui > 1.0):  # More frequent updates
                         rate = processed / max(now - t0, 1e-6)
+                        avg_rate = self._calculate_average_rate(rate)
+                        stage_elapsed = self._get_stage_elapsed()
                         remain = total_media - processed
                         eta_sec = int(remain / max(rate, 1e-6))
                         eta_m, eta_s = eta_sec // 60, eta_sec % 60
@@ -1004,7 +1066,7 @@ class Orchestrator(QThread):
                         self.progress.emit(processed, total_media)
                         self.substage.emit(
                             f"Mapping JSON… {processed}/{total_media} ({dir_progress}% dirs)  |  "
-                            f"{rate:.1f} files/s  |  ETA {eta_m}m {eta_s}s  |  in {rel_path}"
+                            f"Current: {rate:.1f} files/s  |  Avg: {avg_rate:.1f} files/s  |  ETA {eta_m}m {eta_s}s  |  in {rel_path}"
                         )
                         last_ui = now
                         
@@ -1069,6 +1131,7 @@ class Orchestrator(QThread):
         return None
 
     def stage_merge(self):
+        self._start_stage("Merging")
         self.stage.emit("Merging…")
         self.substage.emit("")
         for p in [self.source, self.completed, self.failed, self.logs]:
@@ -1104,11 +1167,19 @@ class Orchestrator(QThread):
                 self.thumb.emit(thumb_path, media.name)
                 self.remaining.emit(imgs_left, vids_left)
 
-                # progress subline (ETA)
+                # progress subline (ETA) with enhanced metrics
                 rate = idx / max(time.time() - t0, 1e-6)
+                avg_rate = self._calculate_average_rate(rate)
+                stage_elapsed = self._get_stage_elapsed()
                 remain = total - idx
                 eta = int(remain / max(rate, 1e-6))
-                self.substage.emit(f"Merging… {idx}/{total}  |  {rate:.1f} files/s  |  ETA {eta//60}m {eta%60}s")
+                
+                stage_time_str = ""
+                if stage_elapsed:
+                    mins, secs = divmod(int(stage_elapsed), 60)
+                    stage_time_str = f"  |  Stage: {mins:02d}:{secs:02d}"
+                
+                self.substage.emit(f"Merging… {idx}/{total}  |  Current: {rate:.1f} files/s  |  Avg: {avg_rate:.1f} files/s  |  ETA {eta//60}m {eta%60}s{stage_time_str}")
 
                 if sidecar is None or not sidecar.exists():
                     msg = "No matching JSON sidecar"
@@ -1116,6 +1187,7 @@ class Orchestrator(QThread):
                     writer.writerow([str(media), "", "FAILED", msg])
                     self.move_pair(media, None, ok=False)
                     fail_ct += 1
+                    self.failure_reasons["no_json"] += 1
                     self.counts.emit(ok_ct, fail_ct, warn_ct)
                     self.progress.emit(idx, total)
                     continue
@@ -1128,6 +1200,7 @@ class Orchestrator(QThread):
                     writer.writerow([str(media), str(sidecar), "FAILED", msg])
                     self.move_pair(media, sidecar, ok=False)
                     fail_ct += 1
+                    self.failure_reasons["bad_json"] += 1
                     self.counts.emit(ok_ct, fail_ct, warn_ct)
                     self.progress.emit(idx, total)
                     continue
@@ -1140,6 +1213,7 @@ class Orchestrator(QThread):
                     writer.writerow([str(media), str(sidecar), "FAILED", msg])
                     self.move_pair(media, sidecar, ok=False)
                     fail_ct += 1
+                    self.failure_reasons["exiftool_error"] += 1
                     self.counts.emit(ok_ct, fail_ct, warn_ct)
                     self.progress.emit(idx, total)
                     continue
@@ -1153,6 +1227,7 @@ class Orchestrator(QThread):
                         partner_msg = f"Live partner failed: {partner.name}: {err2.strip() or out2.strip()}"
                         self.log(f"WARN: {partner_msg}")
                         warn_ct += 1
+                        self.failure_reasons["partner_error"] += 1
 
                 self.log(f"OK: {media}")
                 writer.writerow([str(media), str(sidecar),
@@ -1163,6 +1238,8 @@ class Orchestrator(QThread):
                 self.counts.emit(ok_ct, fail_ct, warn_ct)
                 self.progress.emit(idx, total)
 
+        # Emit failure summary
+        self.failure_summary.emit(self.failure_reasons.copy())
         self.finished_files.emit(str(report_csv), str(log_path))
 
     # -------- Thread entry --------
@@ -1191,6 +1268,7 @@ class App(QWidget):
         self.resize(1400, 900)
         self.setMinimumSize(1200, 800)
         self.worker: Optional[Orchestrator] = None
+        self.is_dry_run_mode = False
         self._setup_modern_theme()
         self._build_ui()
         
@@ -1276,6 +1354,9 @@ class App(QWidget):
         # Add visual feedback
         self.append_log(f"📁 Source folder selected: {os.path.basename(path)}")
         
+        # Check if retry button should be enabled
+        self._check_enable_retry_button()
+        
         # Animate the dropzone to show success
         self.source_dropzone.setStyleSheet("""
             ModernDropZone {
@@ -1317,9 +1398,49 @@ class App(QWidget):
         def should_set(box: QLineEdit):
             val = Path(box.text()) if box.text().strip() else None
             return (val is None) or ("EasyTakeout-Results" in (str(val) if val else ""))
-        if should_set(self.inp_completed): self.inp_completed.setText(str(comp))
-        if should_set(self.inp_failed):    self.inp_failed.setText(str(fail))
-        if should_set(self.inp_logs):      self.inp_logs.setText(str(logs))
+        
+        # Check if we're actually setting the defaults
+        auto_created = False
+        if should_set(self.inp_completed): 
+            self.inp_completed.setText(str(comp))
+            auto_created = True
+        if should_set(self.inp_failed):    
+            self.inp_failed.setText(str(fail))
+            auto_created = True
+        if should_set(self.inp_logs):      
+            self.inp_logs.setText(str(logs))
+            auto_created = True
+        
+        # Show visual confirmation if we auto-created the structure
+        if auto_created:
+            self._show_smart_defaults_feedback(str(results))
+
+    def _show_smart_defaults_feedback(self, results_path: str):
+        """Show visual confirmation that output structure was auto-created"""
+        # Add a temporary notification to the log
+        self.append_log("✅ Auto-created output structure: EasyTakeout-Results")
+        
+        # Create a subtle notification that fades after a few seconds
+        if hasattr(self, 'dest_card'):
+            # Add a temporary checkmark and message to the destination card
+            if not hasattr(self, 'smart_feedback_label'):
+                self.smart_feedback_label = QLabel("✅ Auto-created output structure")
+                self.smart_feedback_label.setStyleSheet("""
+                    QLabel {
+                        color: #00d4aa;
+                        font-size: 12px;
+                        font-weight: 600;
+                        background-color: rgba(0, 212, 170, 0.1);
+                        border-radius: 4px;
+                        padding: 4px 8px;
+                        margin-top: 5px;
+                    }
+                """)
+                self.smart_feedback_label.setAlignment(Qt.AlignCenter)
+                self.dest_card.layout.addWidget(self.smart_feedback_label)
+                
+                # Auto-hide after 5 seconds
+                QTimer.singleShot(5000, lambda: self.smart_feedback_label.hide())
 
     def _build_ui(self):
         main_layout = QHBoxLayout(self)
@@ -1365,7 +1486,7 @@ class App(QWidget):
         left_panel.addWidget(source_card)
         
         # Destination folders card
-        dest_card = ModernCard("🎯 Output Folders")
+        self.dest_card = ModernCard("🎯 Output Folders")
         dest_grid = QGridLayout()
         dest_grid.setSpacing(12)
         
@@ -1397,21 +1518,85 @@ class App(QWidget):
         dest_grid.addWidget(logs_label, 2, 0)
         dest_grid.addWidget(self.inp_logs, 2, 1)
         
-        dest_card.layout.addLayout(dest_grid)
-        left_panel.addWidget(dest_card)
+        self.dest_card.layout.addLayout(dest_grid)
+        left_panel.addWidget(self.dest_card)
 
         # Options card
         options_card = ModernCard("⚙️ Processing Options")
         options_layout = QVBoxLayout()
         
+        # Profile presets dropdown
+        preset_layout = QVBoxLayout()
+        preset_layout.setSpacing(8)
+        
+        preset_label = QLabel("🎛️ Profile Presets:")
+        preset_label.setStyleSheet("color: #ffffff; font-weight: 600;")
+        
+        from PySide6.QtWidgets import QComboBox
+        self.preset_combo = QComboBox()
+        self.preset_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #2d2d2d;
+                border: 2px solid #3d3d3d;
+                border-radius: 8px;
+                padding: 8px 12px;
+                font-size: 14px;
+                color: #ffffff;
+                min-height: 20px;
+            }
+            QComboBox:hover {
+                border-color: #00d4aa;
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 20px;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border: none;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #2d2d2d;
+                border: 1px solid #3d3d3d;
+                border-radius: 4px;
+                color: #ffffff;
+                selection-background-color: #00d4aa;
+                padding: 4px;
+            }
+        """)
+        
+        # Add preset options
+        self.preset_combo.addItem("🟢 Standard (overwrite EXIF)")
+        self.preset_combo.addItem("🟡 Safe (don't overwrite, only add missing)")
+        self.preset_combo.addItem("🔵 Debug (dry run + full logs)")
+        self.preset_combo.addItem("⚙️ Custom")
+        
+        self.preset_combo.currentTextChanged.connect(self._on_preset_changed)
+        self.preset_combo.setToolTip("""Select a processing profile:
+🟢 Standard: Recommended for most users - overwrites existing metadata
+🟡 Safe: Conservative approach - only adds missing metadata
+🔵 Debug: Preview mode with detailed logging - no files modified
+⚙️ Custom: Manual control over all settings""")
+        
+        preset_layout.addWidget(preset_label)
+        preset_layout.addWidget(self.preset_combo)
+        options_layout.addLayout(preset_layout)
+        
+        # Add spacing
+        options_layout.addSpacing(10)
+        
         # Toggles
         self.chk_preserve = ModernToggle("Preserve folder structure")
         self.chk_preserve.setChecked(True)
+        self.chk_preserve.stateChanged.connect(self._on_manual_option_change)
         
         self.chk_overwrite = ModernToggle("Overwrite existing metadata")
         self.chk_overwrite.setChecked(True)
+        self.chk_overwrite.stateChanged.connect(self._on_manual_option_change)
         
         self.chk_dryrun = ModernToggle("Dry run (preview only)")
+        self.chk_dryrun.stateChanged.connect(self._on_dry_run_toggle)
+        self.chk_dryrun.stateChanged.connect(self._on_manual_option_change)
         
         options_layout.addWidget(self.chk_preserve)
         options_layout.addWidget(self.chk_overwrite)
@@ -1442,8 +1627,12 @@ class App(QWidget):
 
         # Control buttons
         controls_card = ModernCard("🎮 Controls")
-        controls_layout = QHBoxLayout()
-        controls_layout.setSpacing(15)
+        controls_layout = QVBoxLayout()
+        controls_layout.setSpacing(10)
+        
+        # Main controls row
+        main_controls = QHBoxLayout()
+        main_controls.setSpacing(15)
         
         self.btn_start = ModernButton("▶️ Start Processing", "primary")
         self.btn_pause = ModernButton("⏸️ Pause", "secondary")
@@ -1458,9 +1647,17 @@ class App(QWidget):
         self.btn_pause.clicked.connect(self.on_pause_toggle)
         self.btn_stop.clicked.connect(self.on_stop)
         
-        controls_layout.addWidget(self.btn_start)
-        controls_layout.addWidget(self.btn_pause)
-        controls_layout.addWidget(self.btn_stop)
+        main_controls.addWidget(self.btn_start)
+        main_controls.addWidget(self.btn_pause)
+        main_controls.addWidget(self.btn_stop)
+        
+        # Retry failed button
+        self.btn_retry_failed = ModernButton("🔄 Retry Only Failed", "secondary")
+        self.btn_retry_failed.setEnabled(False)  # Disabled until failed folder exists
+        self.btn_retry_failed.clicked.connect(self.on_retry_failed)
+        
+        controls_layout.addLayout(main_controls)
+        controls_layout.addWidget(self.btn_retry_failed)
         
         controls_card.layout.addLayout(controls_layout)
         left_panel.addWidget(controls_card)
@@ -1519,6 +1716,37 @@ class App(QWidget):
         
         progress_card.layout.addLayout(progress_layout)
         right_panel.addWidget(progress_card)
+        
+        # Dry run banner (initially hidden)
+        self.dry_run_banner = ModernCard()
+        self.dry_run_banner.setStyleSheet("""
+            ModernCard {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 rgba(54, 162, 235, 0.15), stop:1 rgba(54, 162, 235, 0.05));
+                border: 2px solid #36a2eb;
+                border-radius: 12px;
+            }
+        """)
+        banner_layout = QHBoxLayout()
+        banner_layout.setContentsMargins(15, 10, 15, 10)
+        
+        banner_icon = QLabel("🔍")
+        banner_icon.setStyleSheet("font-size: 24px;")
+        
+        banner_text = QLabel("DRY RUN MODE — No changes will be made to your files")
+        banner_text.setStyleSheet("""
+            font-size: 14px;
+            font-weight: 600;
+            color: #36a2eb;
+        """)
+        
+        banner_layout.addWidget(banner_icon)
+        banner_layout.addWidget(banner_text)
+        banner_layout.addStretch()
+        
+        self.dry_run_banner.layout.addLayout(banner_layout)
+        self.dry_run_banner.hide()  # Initially hidden
+        right_panel.addWidget(self.dry_run_banner)
         
         # Stats cards row
         stats_layout = QHBoxLayout()
@@ -1692,6 +1920,180 @@ class App(QWidget):
         self.chk_preserve.setToolTip("Keep the original folder structure in output")
         self.chk_overwrite.setToolTip("Replace existing EXIF metadata in files")
         self.chk_dryrun.setToolTip("Preview changes without actually modifying files")
+
+    def _on_dry_run_toggle(self, state):
+        """Handle dry run mode toggle"""
+        self.is_dry_run_mode = bool(state)
+        if self.is_dry_run_mode:
+            self._apply_dry_run_theme()
+            self.dry_run_banner.show()
+            self.append_log("🔍 Dry run mode enabled - No files will be modified")
+        else:
+            self._apply_normal_theme()
+            self.dry_run_banner.hide()
+            self.append_log("💾 Dry run mode disabled - Files will be modified normally")
+
+    def _on_preset_changed(self, preset_text: str):
+        """Handle preset selection changes"""
+        # Temporarily disconnect manual change signals to avoid recursion
+        self.chk_preserve.stateChanged.disconnect()
+        self.chk_overwrite.stateChanged.disconnect()
+        self.chk_dryrun.stateChanged.disconnect()
+        
+        try:
+            if preset_text.startswith("🟢 Standard"):
+                # Standard: overwrite EXIF, preserve structure, no dry run
+                self.chk_preserve.setChecked(True)
+                self.chk_overwrite.setChecked(True)
+                self.chk_dryrun.setChecked(False)
+                self.append_log("🟢 Applied Standard preset: overwrite EXIF enabled")
+                
+            elif preset_text.startswith("🟡 Safe"):
+                # Safe: don't overwrite, preserve structure, no dry run
+                self.chk_preserve.setChecked(True)
+                self.chk_overwrite.setChecked(False)
+                self.chk_dryrun.setChecked(False)
+                self.append_log("🟡 Applied Safe preset: only add missing metadata")
+                
+            elif preset_text.startswith("🔵 Debug"):
+                # Debug: dry run mode, preserve structure, don't overwrite
+                self.chk_preserve.setChecked(True)
+                self.chk_overwrite.setChecked(False)
+                self.chk_dryrun.setChecked(True)
+                self.append_log("🔵 Applied Debug preset: dry run mode with full logging")
+                
+            elif preset_text.startswith("⚙️ Custom"):
+                # Custom: don't change anything, user controls all settings
+                self.append_log("⚙️ Custom preset selected: manual control enabled")
+        
+        finally:
+            # Reconnect signals
+            self.chk_preserve.stateChanged.connect(self._on_manual_option_change)
+            self.chk_overwrite.stateChanged.connect(self._on_manual_option_change)
+            self.chk_dryrun.stateChanged.connect(self._on_dry_run_toggle)
+            self.chk_dryrun.stateChanged.connect(self._on_manual_option_change)
+            
+            # Trigger dry run toggle if needed
+            self._on_dry_run_toggle(self.chk_dryrun.isChecked())
+
+    def _on_manual_option_change(self):
+        """Handle manual changes to options - switch to Custom preset"""
+        # Check if current settings match any preset
+        preserve = self.chk_preserve.isChecked()
+        overwrite = self.chk_overwrite.isChecked()
+        dryrun = self.chk_dryrun.isChecked()
+        
+        # Temporarily disconnect to avoid recursion
+        self.preset_combo.currentTextChanged.disconnect()
+        
+        try:
+            if preserve and overwrite and not dryrun:
+                self.preset_combo.setCurrentText("🟢 Standard (overwrite EXIF)")
+            elif preserve and not overwrite and not dryrun:
+                self.preset_combo.setCurrentText("🟡 Safe (don't overwrite, only add missing)")
+            elif preserve and not overwrite and dryrun:
+                self.preset_combo.setCurrentText("🔵 Debug (dry run + full logs)")
+            else:
+                self.preset_combo.setCurrentText("⚙️ Custom")
+        finally:
+            # Reconnect signal
+            self.preset_combo.currentTextChanged.connect(self._on_preset_changed)
+
+    def _apply_dry_run_theme(self):
+        """Apply blue theme for dry run mode"""
+        # Set dry run mode on circular progress
+        self.circular_progress.dry_run_mode = True
+        
+        # Update progress card with blue theme
+        self.circular_progress.setStyleSheet("""
+            CircularProgress {
+                background-color: rgba(54, 162, 235, 0.1);
+                border-radius: 12px;
+            }
+        """)
+        
+        # Update stage label with blue color
+        self.lbl_stage.setStyleSheet("""
+            QLabel {
+                font-size: 20px;
+                font-weight: 600;
+                color: #36a2eb;
+                margin-bottom: 10px;
+            }
+        """)
+        
+        # Update start button to show preview mode
+        self.btn_start.setText("🔍 Start Preview")
+        self.btn_start.setStyleSheet("""
+            ModernButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #36a2eb, stop:1 #2c8bd9);
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 600;
+                padding: 12px 24px;
+            }
+            ModernButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #4db8ff, stop:1 #36a2eb);
+            }
+            ModernButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #2c8bd9, stop:1 #1f6bb3);
+            }
+            ModernButton:disabled {
+                background: #555555;
+                color: #999999;
+            }
+        """)
+
+    def _apply_normal_theme(self):
+        """Apply normal green theme"""
+        # Reset dry run mode on circular progress
+        self.circular_progress.dry_run_mode = False
+        
+        # Reset progress card
+        self.circular_progress.setStyleSheet("")
+        
+        # Reset stage label
+        self.lbl_stage.setStyleSheet("""
+            QLabel {
+                font-size: 20px;
+                font-weight: 600;
+                color: #00d4aa;
+                margin-bottom: 10px;
+            }
+        """)
+        
+        # Reset start button
+        self.btn_start.setText("▶️ Start Processing")
+        self.btn_start.setStyleSheet("""
+            ModernButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00d4aa, stop:1 #00b894);
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 600;
+                padding: 12px 24px;
+            }
+            ModernButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00e6c0, stop:1 #00d4aa);
+                transform: translateY(-1px);
+            }
+            ModernButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00b894, stop:1 #00a085);
+            }
+            ModernButton:disabled {
+                background: #555555;
+                color: #999999;
+            }
+        """)
 
     def _maybe_autofill_from_text(self):
         t = self.inp_source.text().strip()
@@ -1911,6 +2313,7 @@ class App(QWidget):
         self.worker.finished_files.connect(self.on_finished)
         self.worker.fatal.connect(self.on_fatal)
         self.worker.need_user_confirm.connect(self.on_plan_complete_show_dialog)
+        self.worker.failure_summary.connect(self.on_failure_summary)
         # Start normally - pausing will happen automatically after planning completes
         self.worker.start()
 
@@ -1956,23 +2359,85 @@ class App(QWidget):
         self.btn_start.setEnabled(True)
         self._update_pause_button_style(enabled=False)
 
+    def on_retry_failed(self):
+        """Set source to failed folder and start retry processing"""
+        failed_path = self.inp_failed.text().strip()
+        if not failed_path:
+            QMessageBox.warning(self, "⚠️ No Failed Folder", 
+                               "No failed folder path is set. Please run a process first to generate failed files.")
+            return
+        
+        failed_path_obj = Path(failed_path)
+        if not failed_path_obj.exists():
+            QMessageBox.warning(self, "⚠️ Failed Folder Not Found", 
+                               f"Failed folder doesn't exist:\n{failed_path}")
+            return
+        
+        # Count files in failed folder
+        failed_files = list(failed_path_obj.rglob("*"))
+        media_files = [f for f in failed_files if f.is_file() and is_media_file(f)]
+        
+        if not media_files:
+            QMessageBox.information(self, "ℹ️ No Failed Files", 
+                                   "The failed folder is empty or contains no media files to retry.")
+            return
+        
+        # Confirm retry action
+        reply = QMessageBox.question(self, "🔄 Retry Failed Files", 
+                                   f"Found {len(media_files)} media files in the failed folder.\n\n"
+                                   f"This will:\n"
+                                   f"• Set source to: {failed_path}\n"
+                                   f"• Use current destination settings\n"
+                                   f"• Process only the previously failed files\n\n"
+                                   f"Continue?",
+                                   QMessageBox.Yes | QMessageBox.No)
+        
+        if reply == QMessageBox.Yes:
+            # Set the source to the failed folder
+            self.source_dropzone.set_path(failed_path)
+            self.append_log(f"🔄 Retry mode: Source set to failed folder with {len(media_files)} files")
+            
+            # Disable retry button to prevent multiple clicks
+            self.btn_retry_failed.setEnabled(False)
+
     # ---- Slots ----
     def on_progress(self, processed, total):
         pct = int((processed/total)*100) if total else 0
         self.prog.setValue(pct)
         
-        # Calculate processing rate from substage text if available
+        # Extract rate information from substage text
         rate = 0
-        substage_text = self.lbl_substage.text()
-        if "files/s" in substage_text:
-            try:
-                # Extract rate from substage text like "Mapping… 150/1000 | 2.5 files/s"
-                rate_part = substage_text.split("files/s")[0].split()[-1]
-                rate = float(rate_part)
-            except:
-                rate = 0
+        avg_rate = 0
+        stage_elapsed = None
         
-        self.circular_progress.set_progress(pct, processed, total, rate)
+        substage_text = self.lbl_substage.text()
+        if "Current:" in substage_text and "files/s" in substage_text:
+            try:
+                # Extract current rate from text like "Current: 2.5 files/s"
+                parts = substage_text.split("Current:")
+                if len(parts) > 1:
+                    rate_part = parts[1].split("files/s")[0].strip()
+                    rate = float(rate_part)
+                
+                # Extract average rate from text like "Avg: 3.1 files/s"
+                if "Avg:" in substage_text:
+                    avg_parts = substage_text.split("Avg:")
+                    if len(avg_parts) > 1:
+                        avg_rate_part = avg_parts[1].split("files/s")[0].strip()
+                        avg_rate = float(avg_rate_part)
+                
+                # Extract stage elapsed time from text like "Stage: 02:45"
+                if "Stage:" in substage_text:
+                    time_parts = substage_text.split("Stage:")
+                    if len(time_parts) > 1:
+                        time_str = time_parts[1].strip().split()[0]  # Get "02:45" part
+                        if ":" in time_str:
+                            mins, secs = map(int, time_str.split(":"))
+                            stage_elapsed = mins * 60 + secs
+            except:
+                pass
+        
+        self.circular_progress.set_progress(pct, processed, total, rate, avg_rate, stage_elapsed)
 
     def on_thumb(self, path, caption): 
         self.set_thumb(path, caption)
@@ -2023,6 +2488,179 @@ class App(QWidget):
         self._update_pause_button_style(enabled=False)
         self.btn_pause.setText("⏸️ Pause")
         self._update_pause_button_style(enabled=False)
+        
+        # Enable retry failed button if there are failed files
+        self._check_enable_retry_button()
+
+    def _check_enable_retry_button(self):
+        """Enable retry button if failed folder exists and has media files"""
+        try:
+            failed_path = self.inp_failed.text().strip()
+            if not failed_path:
+                self.btn_retry_failed.setEnabled(False)
+                return
+            
+            failed_path_obj = Path(failed_path)
+            if not failed_path_obj.exists():
+                self.btn_retry_failed.setEnabled(False)
+                return
+            
+            # Check for media files in failed folder
+            media_files = [f for f in failed_path_obj.rglob("*") if f.is_file() and is_media_file(f)]
+            has_failed_files = len(media_files) > 0
+            
+            self.btn_retry_failed.setEnabled(has_failed_files)
+            
+            if has_failed_files:
+                self.btn_retry_failed.setText(f"🔄 Retry {len(media_files)} Failed Files")
+                self.append_log(f"💡 Tip: {len(media_files)} failed files available for retry")
+            else:
+                self.btn_retry_failed.setText("🔄 Retry Only Failed")
+                
+        except Exception as e:
+            self.btn_retry_failed.setEnabled(False)
+            self.append_log(f"Warning: Could not check failed files: {e}")
+
+    def on_failure_summary(self, failure_reasons: dict):
+        """Show failure summary dialog if there are failures"""
+        total_failures = sum(failure_reasons.values())
+        if total_failures > 0:
+            self._show_failure_summary_dialog(failure_reasons)
+
+    def _show_failure_summary_dialog(self, failure_reasons: dict):
+        """Display detailed failure summary in a dialog"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("📊 Failed Files Summary")
+        dialog.setMinimumSize(400, 300)
+        dialog.setStyleSheet("""
+            QDialog {
+                background-color: #1a1a1a;
+                color: #ffffff;
+            }
+            QLabel {
+                color: #ffffff;
+            }
+            QTableWidget {
+                background-color: #2d2d2d;
+                border: 1px solid #3d3d3d;
+                border-radius: 8px;
+                gridline-color: #3d3d3d;
+            }
+            QTableWidget::item {
+                padding: 8px;
+                border-bottom: 1px solid #3d3d3d;
+            }
+            QHeaderView::section {
+                background-color: #3d3d3d;
+                color: #ffffff;
+                padding: 8px;
+                border: none;
+                font-weight: 600;
+            }
+        """)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Title
+        title = QLabel("❌ Processing Failures Breakdown")
+        title.setStyleSheet("""
+            font-size: 16px;
+            font-weight: 600;
+            color: #ff6b6b;
+            margin-bottom: 10px;
+        """)
+        layout.addWidget(title)
+        
+        # Create table
+        from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView
+        table = QTableWidget()
+        table.setRowCount(len([k for k, v in failure_reasons.items() if v > 0]))
+        table.setColumnCount(3)
+        table.setHorizontalHeaderLabels(["Failure Type", "Count", "Description"])
+        
+        # Populate table
+        row = 0
+        reason_descriptions = {
+            "no_json": "No JSON metadata file found",
+            "bad_json": "JSON file corrupted or invalid",
+            "exiftool_error": "ExifTool processing failed",
+            "partner_error": "Live Photo partner file failed",
+            "other_error": "Unknown or miscellaneous error"
+        }
+        
+        reason_icons = {
+            "no_json": "📄",
+            "bad_json": "💥",
+            "exiftool_error": "🔧",
+            "partner_error": "📷",
+            "other_error": "❓"
+        }
+        
+        for reason_type, count in failure_reasons.items():
+            if count > 0:
+                icon = reason_icons.get(reason_type, "❓")
+                type_item = QTableWidgetItem(f"{icon} {reason_type.replace('_', ' ').title()}")
+                count_item = QTableWidgetItem(str(count))
+                desc_item = QTableWidgetItem(reason_descriptions.get(reason_type, "Unknown error"))
+                
+                # Center align count
+                count_item.setTextAlignment(Qt.AlignCenter)
+                
+                # Color code the count based on severity
+                if count > 10:
+                    count_item.setForeground(QColor("#ff6b6b"))  # Red for high count
+                elif count > 5:
+                    count_item.setForeground(QColor("#ffa500"))  # Orange for medium count
+                else:
+                    count_item.setForeground(QColor("#ffffff"))  # White for low count
+                
+                table.setItem(row, 0, type_item)
+                table.setItem(row, 1, count_item)
+                table.setItem(row, 2, desc_item)
+                row += 1
+        
+        # Resize columns to content
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        
+        layout.addWidget(table)
+        
+        # Total summary
+        total_failures = sum(failure_reasons.values())
+        summary = QLabel(f"Total failed files: {total_failures}")
+        summary.setStyleSheet("""
+            font-size: 14px;
+            font-weight: 600;
+            color: #ff6b6b;
+            margin-top: 10px;
+            background-color: rgba(255, 107, 107, 0.1);
+            border-radius: 4px;
+            padding: 8px;
+        """)
+        summary.setAlignment(Qt.AlignCenter)
+        layout.addWidget(summary)
+        
+        # Tip
+        tip = QLabel("💡 Use 'Retry Only Failed' button to reprocess failed files")
+        tip.setStyleSheet("""
+            font-size: 12px;
+            color: #aaaaaa;
+            margin-top: 10px;
+            font-style: italic;
+        """)
+        tip.setAlignment(Qt.AlignCenter)
+        layout.addWidget(tip)
+        
+        # Close button
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        close_btn = ModernButton("Close", "primary")
+        close_btn.clicked.connect(dialog.accept)
+        button_layout.addWidget(close_btn)
+        layout.addLayout(button_layout)
+        
+        dialog.exec()
 
     def on_fatal(self, msg):
         self.append_log(f"❌ FATAL ERROR: {msg}")
