@@ -1,0 +1,135 @@
+name: Bug Report
+description: Report a bug to help us improve EasyTakeout
+title: "[BUG] "
+labels: ["bug", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the information below to help us understand and fix the issue.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      description: Please verify you've completed these steps before submitting
+      options:
+        - label: I've searched existing issues to make sure this bug hasn't been reported
+          required: true
+        - label: I've read the troubleshooting guide in the docs
+          required: true
+        - label: I'm using the latest version of EasyTakeout
+          required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is
+      placeholder: Describe what happened and what you expected to happen
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Step-by-step instructions to reproduce the bug
+      placeholder: |
+        1. Go to '...'
+        2. Click on '....'
+        3. Scroll down to '....'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: Describe the expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: Describe what actually happened
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Information
+      description: Tell us about your system
+      placeholder: |
+        - OS: [e.g., Windows 11, macOS 13.0, Ubuntu 22.04]
+        - EasyTakeout Version: [e.g., 1.0.0]
+        - Python Version (if applicable): [e.g., 3.9.0]
+        - RAM: [e.g., 16GB]
+        - Available Disk Space: [e.g., 500GB]
+    validations:
+      required: true
+
+  - type: textarea
+    id: dataset
+    attributes:
+      label: Dataset Information
+      description: Information about the files you're processing
+      placeholder: |
+        - Approximate number of files: [e.g., 10,000 photos, 500 videos]
+        - Total size: [e.g., 50GB]
+        - Google Takeout export date: [e.g., December 2023]
+        - File types: [e.g., JPG, MP4, HEIC]
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error Messages and Logs
+      description: Include any error messages, log entries, or screenshots
+      placeholder: |
+        Paste error messages here. Log files can be found in:
+        - Windows: %APPDATA%/EasyTakeout/logs/
+        - macOS/Linux: ~/.local/share/EasyTakeout/logs/
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: If applicable, add screenshots to help explain the problem
+      placeholder: Drag and drop images here or paste them
+    validations:
+      required: false
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Bug Severity
+      description: How severe is this bug?
+      options:
+        - Low (Minor inconvenience, workaround available)
+        - Medium (Significant impact, partial functionality affected)
+        - High (Major functionality broken, no workaround)
+        - Critical (Application crash, data loss, security issue)
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem here
+      placeholder: Any additional information that might be helpful
+    validations:
+      required: false

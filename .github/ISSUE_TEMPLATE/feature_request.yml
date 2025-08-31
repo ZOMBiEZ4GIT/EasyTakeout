@@ -1,0 +1,154 @@
+name: Feature Request
+description: Suggest a new feature or enhancement for EasyTakeout
+title: "[FEATURE] "
+labels: ["enhancement", "needs-discussion"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature! Your ideas help make EasyTakeout better for everyone.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      description: Please verify you've completed these steps before submitting
+      options:
+        - label: I've searched existing issues and discussions to make sure this hasn't been suggested
+          required: true
+        - label: I've read the project roadmap to see if this is already planned
+          required: true
+        - label: This feature would benefit multiple users, not just my specific use case
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Use Case
+      description: What problem does this feature solve? What use case does it address?
+      placeholder: |
+        Describe the problem you're trying to solve or the workflow you want to improve.
+        For example: "When processing large Takeout exports, I often need to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: What would you like to see implemented?
+      placeholder: |
+        Describe your proposed solution in detail. Include:
+        - How it would work from a user perspective
+        - Where it would fit in the UI/workflow
+        - Any specific requirements or constraints
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternative Solutions
+      description: Have you considered any alternative approaches?
+      placeholder: |
+        Describe any alternative solutions or workarounds you've considered.
+        Why is your proposed solution better than the alternatives?
+    validations:
+      required: false
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Feature Category
+      description: What category does this feature fall into?
+      options:
+        - User Interface / User Experience
+        - File Processing / Metadata Handling
+        - Performance / Optimization
+        - Integration / Export Options
+        - Configuration / Settings
+        - Command Line Interface
+        - Documentation / Help
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority Level
+      description: How important is this feature to you?
+      options:
+        - Low (Nice to have, would use occasionally)
+        - Medium (Would improve my workflow significantly)
+        - High (Essential for my use case, would save significant time)
+        - Critical (Blocking my ability to use EasyTakeout effectively)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: complexity
+    attributes:
+      label: Estimated Complexity
+      description: How complex do you think this feature would be to implement?
+      options:
+        - Simple (Minor UI change, configuration option)
+        - Medium (New feature with moderate complexity)
+        - Complex (Major feature requiring significant development)
+        - Very Complex (Fundamental changes to core functionality)
+        - Not sure
+    validations:
+      required: false
+
+  - type: textarea
+    id: mockups
+    attributes:
+      label: Mockups or Examples
+      description: If applicable, provide mockups, screenshots, or examples
+      placeholder: |
+        You can drag and drop images here, or describe the feature visually.
+        Examples from other applications are also helpful.
+    validations:
+      required: false
+
+  - type: textarea
+    id: technical
+    attributes:
+      label: Technical Considerations
+      description: Any technical details or considerations?
+      placeholder: |
+        If you have technical knowledge, include:
+        - Potential implementation approaches
+        - Libraries or technologies that could be used
+        - Performance implications
+        - Compatibility concerns
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution Interest
+      description: Would you be interested in contributing to this feature?
+      options:
+        - label: I would be willing to help with design/requirements
+        - label: I would be willing to help with testing
+        - label: I would be willing to help with implementation (if I have the skills)
+        - label: I would be willing to help with documentation
+        - label: I can provide funding or sponsorship for this feature
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any additional information about this feature request
+      placeholder: |
+        Include any other relevant information, such as:
+        - Similar features in other applications
+        - Research you've done on this topic
+        - Community feedback you've received
+        - Timeline considerations
+    validations:
+      required: false
