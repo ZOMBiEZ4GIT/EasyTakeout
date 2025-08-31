@@ -640,12 +640,55 @@ class Orchestrator(QThread):
                     self.log(f"DEBUG: Scanning directory #{total_dirs}: {current_dir}")
                 
                 try:
-                    # Get subdirectories with timeout protection
+                    # Get subdirectories with better error handling for large dirs
+                    self.log(f"DEBUG: About to scan contents of: {current_dir}")
                     subdirs = []
-                    for item in current_dir.iterdir():
-                        if self._stop: break
-                        if item.is_dir():
-                            subdirs.append(item)
+                    item_count = 0
+                    
+                    try:
+                        # Use os.listdir instead of iterdir for better performance on large dirs
+                        self.log(f"DEBUG: Using os.listdir() on: {current_dir}")
+                        dir_contents = os.listdir(str(current_dir))
+                        item_count_total = len(dir_contents)
+                        self.log(f"DEBUG: Found {item_count_total} items in: {current_dir}")
+                        
+                        # Warn about very large directories
+                        if item_count_total > 10000:
+                            self.log(f"WARNING: Very large directory detected ({item_count_total} items): {current_dir}")
+                            self.log("This may take several minutes to process...")
+                        elif item_count_total > 1000:
+                            self.log(f"INFO: Large directory detected ({item_count_total} items): {current_dir}")
+                        
+                        # Process in chunks to avoid blocking UI
+                        chunk_size = 1000  # Process 1000 items at a time
+                        for i in range(0, len(dir_contents), chunk_size):
+                            if self._stop: break
+                            self._maybe_pause()
+                            
+                            chunk = dir_contents[i:i + chunk_size]
+                            for item_name in chunk:
+                                if self._stop: break
+                                
+                                item_path = current_dir / item_name
+                                item_count += 1
+                                
+                                # Update UI every 100 items for very large directories
+                                if item_count % 100 == 0:
+                                    self.log(f"DEBUG: Processed {item_count}/{len(dir_contents)} items in {current_dir}")
+                                
+                                try:
+                                    if item_path.is_dir():
+                                        subdirs.append(item_path)
+                                except (OSError, PermissionError):
+                                    # Skip items we can't access
+                                    continue
+                                    
+                        self.log(f"DEBUG: Found {len(subdirs)} subdirectories in: {current_dir}")
+                        
+                    except PermissionError:
+                        self.log(f"DEBUG: Permission denied listing contents of: {current_dir}")
+                    except Exception as e:
+                        self.log(f"DEBUG: Error listing contents of {current_dir}: {e}")
                             
                     # Add subdirs to queue
                     directories_to_scan.extend(subdirs)
