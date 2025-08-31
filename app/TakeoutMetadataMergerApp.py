@@ -2148,7 +2148,6 @@ class App(QWidget):
                     source_path = None
                     if hasattr(self, 'worker') and self.worker and hasattr(self.worker, 'source'):
                         # Try to find the actual file
-                        from pathlib import Path
                         for media_file in Path(self.worker.source).rglob(caption):
                             if media_file.is_file():
                                 source_path = media_file
