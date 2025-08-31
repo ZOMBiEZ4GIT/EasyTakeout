@@ -151,13 +151,14 @@ class ModernCard(QFrame):
         self.setFrameStyle(QFrame.NoFrame)
         self.setStyleSheet("""
             ModernCard {
-                background-color: #2d2d2d;
+                background-color: #1E1E1E;
                 border-radius: 12px;
-                border: 1px solid #3d3d3d;
+                border: 1px solid #2A2A2A;
+                padding: 0px;
             }
             ModernCard:hover {
-                border: 1px solid #00d4aa;
-                background-color: #323232;
+                border: 1px solid #4CAF50;
+                background-color: #222222;
             }
         """)
         
@@ -180,8 +181,12 @@ class ModernCard(QFrame):
                 QLabel {
                     font-size: 16px;
                     font-weight: 600;
-                    color: #ffffff;
-                    margin-bottom: 5px;
+                    color: #4CAF50;
+                    margin: 0px 0px 12px 0px;
+                    padding-left: 4px;
+                    letter-spacing: 0.5px;
+                    background: transparent;
+                    border: none;
                 }
             """)
             self.layout.addWidget(self.title_label)
@@ -202,62 +207,72 @@ class ModernButton(QPushButton):
             self.setStyleSheet("""
                 ModernButton {
                     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                        stop:0 #00d4aa, stop:1 #00b894);
+                        stop:0 #4CAF50, stop:1 #2E7D32);
                     color: white;
                     border: none;
-                    border-radius: 8px;
+                    border-radius: 21px;
                     font-size: 14px;
                     font-weight: 600;
                     padding: 12px 24px;
                 }
                 ModernButton:hover {
                     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                        stop:0 #00e6c0, stop:1 #00d4aa);
+                        stop:0 #66BB6A, stop:1 #4CAF50);
                     transform: translateY(-1px);
                 }
                 ModernButton:pressed {
                     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                        stop:0 #00b894, stop:1 #00a085);
+                        stop:0 #2E7D32, stop:1 #1B5E20);
                 }
                 ModernButton:disabled {
-                    background: #555555;
-                    color: #999999;
+                    background: #333333;
+                    color: #666666;
                 }
             """)
         elif button_type == "secondary":
             self.setStyleSheet("""
                 ModernButton {
-                    background: transparent;
-                    color: #ffffff;
-                    border: 2px solid #00d4aa;
-                    border-radius: 8px;
-                    font-size: 14px;
-                    font-weight: 500;
-                    padding: 10px 20px;
-                }
-                ModernButton:hover {
-                    background: rgba(0, 212, 170, 0.1);
-                    border-color: #00e6c0;
-                }
-                ModernButton:pressed {
-                    background: rgba(0, 212, 170, 0.2);
-                }
-            """)
-        elif button_type == "danger":
-            self.setStyleSheet("""
-                ModernButton {
-                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                        stop:0 #ff6b6b, stop:1 #e55656);
+                    background: #2196F3;
                     color: white;
                     border: none;
-                    border-radius: 8px;
+                    border-radius: 21px;
                     font-size: 14px;
                     font-weight: 600;
                     padding: 12px 24px;
                 }
                 ModernButton:hover {
-                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                        stop:0 #ff7d7d, stop:1 #ff6b6b);
+                    background: #42A5F5;
+                    transform: translateY(-1px);
+                }
+                ModernButton:pressed {
+                    background: #1976D2;
+                }
+                ModernButton:disabled {
+                    background: #333333;
+                    color: #666666;
+                }
+            """)
+        elif button_type == "danger":
+            self.setStyleSheet("""
+                ModernButton {
+                    background: #F44336;
+                    color: white;
+                    border: none;
+                    border-radius: 21px;
+                    font-size: 14px;
+                    font-weight: 600;
+                    padding: 12px 24px;
+                }
+                ModernButton:hover {
+                    background: #EF5350;
+                    transform: translateY(-1px);
+                }
+                ModernButton:pressed {
+                    background: #D32F2F;
+                }
+                ModernButton:disabled {
+                    background: #333333;
+                    color: #666666;
                 }
             """)
 
@@ -273,14 +288,14 @@ class ModernDropZone(QFrame):
         
         self.setStyleSheet("""
             ModernDropZone {
-                background-color: #252525;
-                border: 2px dashed #555555;
+                background-color: #181818;
+                border: 2px dashed #333333;
                 border-radius: 12px;
                 color: #aaaaaa;
             }
             ModernDropZone:hover {
-                border-color: #00d4aa;
-                background-color: rgba(0, 212, 170, 0.05);
+                border-color: #4CAF50;
+                background-color: rgba(76, 175, 80, 0.05);
             }
         """)
         
@@ -298,7 +313,7 @@ class ModernDropZone(QFrame):
         
         self.path_label = QLabel("")
         self.path_label.setAlignment(Qt.AlignCenter)
-        self.path_label.setStyleSheet("font-size: 12px; color: #00d4aa; margin-top: 5px;")
+        self.path_label.setStyleSheet("font-size: 12px; color: #4CAF50; margin-top: 5px;")
         self.path_label.hide()
         
         layout.addWidget(self.icon_label)
@@ -316,8 +331,8 @@ class ModernDropZone(QFrame):
             event.acceptProposedAction()
             self.setStyleSheet("""
                 ModernDropZone {
-                    background-color: rgba(0, 212, 170, 0.1);
-                    border: 2px solid #00d4aa;
+                    background-color: rgba(76, 175, 80, 0.1);
+                    border: 2px solid #4CAF50;
                     border-radius: 12px;
                 }
             """)
@@ -325,13 +340,13 @@ class ModernDropZone(QFrame):
     def dragLeaveEvent(self, event):
         self.setStyleSheet("""
             ModernDropZone {
-                background-color: #252525;
-                border: 2px dashed #555555;
+                background-color: #181818;
+                border: 2px dashed #333333;
                 border-radius: 12px;
             }
             ModernDropZone:hover {
-                border-color: #00d4aa;
-                background-color: rgba(0, 212, 170, 0.05);
+                border-color: #4CAF50;
+                background-color: rgba(76, 175, 80, 0.05);
             }
         """)
         
@@ -414,23 +429,23 @@ class CircularProgress(QWidget):
         if self.dry_run_mode:
             # Blue theme for dry run mode
             if self.processing_rate <= 0:
-                return QColor("#36a2eb")  # Default blue
+                return QColor("#2196F3")  # Default blue
             elif self.processing_rate > 2.0:  # Fast processing
-                return QColor("#36a2eb")  # Blue
+                return QColor("#2196F3")  # Blue
             elif self.processing_rate > 0.5:  # Medium speed
-                return QColor("#87ceeb")  # Light blue
+                return QColor("#42A5F5")  # Light blue
             else:  # Slow processing
-                return QColor("#4682b4")  # Steel blue
+                return QColor("#1976D2")  # Dark blue
         else:
-            # Normal green theme
+            # Neon-style progress colors
             if self.processing_rate <= 0:
-                return QColor("#00d4aa")  # Default green
+                return QColor("#4CAF50")  # Completed: Green
             elif self.processing_rate > 2.0:  # Fast processing
-                return QColor("#00d4aa")  # Green
+                return QColor("#4CAF50")  # Green for good performance
             elif self.processing_rate > 0.5:  # Medium speed
-                return QColor("#ffa500")  # Orange
-            else:  # Slow processing
-                return QColor("#ff6b6b")  # Red
+                return QColor("#FFC107")  # Warnings: Orange
+            else:  # Slow processing or failures
+                return QColor("#F44336")  # Failures: Red
         
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -481,8 +496,8 @@ class ModernToggle(QCheckBox):
                 border: 2px solid #666666;
             }
             QCheckBox::indicator:checked {
-                background-color: #00d4aa;
-                border-color: #00d4aa;
+                background-color: #4CAF50;
+                border-color: #4CAF50;
             }
             QCheckBox::indicator::handle {
                 width: 20px;
@@ -514,7 +529,7 @@ class ModernStatsCard(ModernCard):
         self.value_label.setStyleSheet("""
             font-size: 24px;
             font-weight: 700;
-            color: #00d4aa;
+            color: #4CAF50;
             margin: 0;
         """)
         
@@ -571,8 +586,8 @@ class OutputFolderCard(ModernCard):
         self.count_label.setStyleSheet("""
             font-size: 18px;
             font-weight: 700;
-            color: #00d4aa;
-            background-color: rgba(0, 212, 170, 0.1);
+            color: #4CAF50;
+            background-color: rgba(76, 175, 80, 0.1);
             border-radius: 12px;
             padding: 4px 8px;
             margin: 5px 0;
@@ -595,13 +610,13 @@ class OutputFolderCard(ModernCard):
         # Add hover effect
         self.setStyleSheet("""
             OutputFolderCard {
-                background-color: #2d2d2d;
+                background-color: #1E1E1E;
                 border-radius: 12px;
-                border: 1px solid #3d3d3d;
+                border: 1px solid #2A2A2A;
             }
             OutputFolderCard:hover {
-                border: 1px solid #00d4aa;
-                background-color: #323232;
+                border: 1px solid #4CAF50;
+                background-color: #222222;
                 transform: translateY(-2px);
             }
         """)
@@ -621,7 +636,7 @@ class OutputFolderCard(ModernCard):
                 font-size: 18px;
                 font-weight: 700;
                 color: #ffffff;
-                background-color: #00d4aa;
+                background-color: #4CAF50;
                 border-radius: 12px;
                 padding: 4px 8px;
                 margin: 5px 0;
@@ -630,8 +645,8 @@ class OutputFolderCard(ModernCard):
             self.count_label.setStyleSheet("""
                 font-size: 18px;
                 font-weight: 700;
-                color: #00d4aa;
-                background-color: rgba(0, 212, 170, 0.1);
+                color: #4CAF50;
+                background-color: rgba(76, 175, 80, 0.1);
                 border-radius: 12px;
                 padding: 4px 8px;
                 margin: 5px 0;
@@ -1276,69 +1291,71 @@ class App(QWidget):
         """Apply the modern dark theme to the entire application"""
         self.setStyleSheet("""
             QWidget {
-                background-color: #1a1a1a;
+                background-color: #121212;
                 color: #ffffff;
                 font-family: 'Segoe UI', 'Inter', 'Arial', sans-serif;
                 font-size: 13px;
             }
             
             QMainWindow {
-                background-color: #1a1a1a;
+                background-color: #121212;
             }
             
             QLineEdit {
-                background-color: #2d2d2d;
-                border: 2px solid #3d3d3d;
-                border-radius: 8px;
+                background-color: #1E1E1E;
+                border: 1px solid #2A2A2A;
+                border-radius: 10px;
                 padding: 12px 16px;
                 font-size: 14px;
                 color: #ffffff;
-                selection-background-color: #00d4aa;
+                selection-background-color: #4CAF50;
             }
             
             QLineEdit:focus {
-                border-color: #00d4aa;
-                background-color: #323232;
+                border-color: #4CAF50;
+                background-color: #222222;
+                box-shadow: 0 0 8px rgba(76, 175, 80, 0.3);
             }
             
             QTextEdit {
-                background-color: #242424;
-                border: 1px solid #3d3d3d;
-                border-radius: 8px;
+                background-color: #181818;
+                border: 1px solid #2A2A2A;
+                border-radius: 10px;
                 padding: 12px;
-                font-family: 'Consolas', 'Monaco', monospace;
+                font-family: 'Consolas', 'Monaco', 'JetBrains Mono', monospace;
                 font-size: 12px;
-                line-height: 1.4;
+                line-height: 1.5;
+                color: #ffffff;
             }
             
             QProgressBar {
-                background-color: #2d2d2d;
+                background-color: #333333;
                 border: none;
-                border-radius: 8px;
+                border-radius: 10px;
                 height: 8px;
                 text-align: center;
             }
             
             QProgressBar::chunk {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #00d4aa, stop:1 #00b894);
-                border-radius: 8px;
+                    stop:0 #4CAF50, stop:1 #2E7D32);
+                border-radius: 10px;
             }
             
             QScrollBar:vertical {
-                background-color: #2d2d2d;
+                background-color: #1E1E1E;
                 width: 12px;
                 border-radius: 6px;
             }
             
             QScrollBar::handle:vertical {
-                background-color: #555555;
+                background-color: #333333;
                 border-radius: 6px;
                 min-height: 20px;
             }
             
             QScrollBar::handle:vertical:hover {
-                background-color: #666666;
+                background-color: #4CAF50;
             }
             
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
@@ -1536,16 +1553,16 @@ class App(QWidget):
         self.preset_combo = QComboBox()
         self.preset_combo.setStyleSheet("""
             QComboBox {
-                background-color: #2d2d2d;
-                border: 2px solid #3d3d3d;
-                border-radius: 8px;
+                background-color: #1E1E1E;
+                border: 1px solid #2A2A2A;
+                border-radius: 10px;
                 padding: 8px 12px;
                 font-size: 14px;
                 color: #ffffff;
                 min-height: 20px;
             }
             QComboBox:hover {
-                border-color: #00d4aa;
+                border-color: #4CAF50;
             }
             QComboBox::drop-down {
                 border: none;
@@ -1556,11 +1573,11 @@ class App(QWidget):
                 border: none;
             }
             QComboBox QAbstractItemView {
-                background-color: #2d2d2d;
-                border: 1px solid #3d3d3d;
-                border-radius: 4px;
+                background-color: #1E1E1E;
+                border: 1px solid #2A2A2A;
+                border-radius: 8px;
                 color: #ffffff;
-                selection-background-color: #00d4aa;
+                selection-background-color: #4CAF50;
                 padding: 4px;
             }
         """)
@@ -1797,10 +1814,9 @@ class App(QWidget):
         thumb_container = QFrame()
         thumb_container.setStyleSheet("""
             QFrame {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #2a2a2a, stop:1 #1f1f1f);
+                background: #181818;
                 border-radius: 12px;
-                border: 2px solid #333333;
+                border: 1px solid #2A2A2A;
             }
         """)
         thumb_container.setMinimumHeight(200)
@@ -2188,20 +2204,49 @@ class App(QWidget):
                 # Scale to fit the container nicely
                 scaled_pm = pm.scaled(180, 180, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 self.thumb.setPixmap(scaled_pm)
-                self.thumb.setStyleSheet("""
-                    background: transparent;
-                    border: none;
-                    border-radius: 8px;
-                """)
+                
+                # Determine if this is an image or video based on caption
+                is_video = any(ext in caption.lower() for ext in ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v']) if caption else False
+                
+                if is_video:
+                    # Purple glow for video thumbnails
+                    self.thumb.setStyleSheet("""
+                        background: transparent;
+                        border: 2px solid #9C27B0;
+                        border-radius: 8px;
+                        padding: 4px;
+                    """)
+                else:
+                    # Cyan glow for image thumbnails  
+                    self.thumb.setStyleSheet("""
+                        background: transparent;
+                        border: 2px solid #00BCD4;
+                        border-radius: 8px;
+                        padding: 4px;
+                    """)
                 return
-        # Fallback to emoji if no image
-        self.thumb.setText("🎞️")
-        self.thumb.setStyleSheet("""
-            font-size: 48px;
-            color: #555555;
-            background: transparent;
-            border: none;
-        """)
+        
+        # Fallback icons with better styling
+        is_video = any(ext in caption.lower() for ext in ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v']) if caption else False
+        
+        if is_video:
+            self.thumb.setText("🎬")
+            self.thumb.setStyleSheet("""
+                font-size: 48px;
+                color: #9C27B0;
+                background: transparent;
+                border: 2px solid #9C27B0;
+                border-radius: 12px;
+                padding: 12px;
+            """)
+        else:
+            self.thumb.setText("🎯")
+            self.thumb.setStyleSheet("""
+                font-size: 48px;
+                color: #00BCD4;
+                background: transparent;
+                border: none;
+            """)
 
     def append_log(self, line: str):
         """Enhanced log append with color coding"""
@@ -2221,19 +2266,26 @@ class App(QWidget):
             self.activity_stream.verticalScrollBar().maximum()))
     
     def _colorize_log_line(self, line: str) -> str:
-        """Add HTML color coding to log lines based on content"""
+        """Add HTML color coding and icons to log lines based on content"""
         line_lower = line.lower()
         
+        # Apply monospace font and add icons
         if any(word in line_lower for word in ['error', 'fail', 'fatal', '❌']):
-            return f'<span style="color: #ff6b6b;">{line}</span>'
+            if not line.startswith('❌'):
+                line = f"❌ {line}"
+            return f'<span style="font-family: Consolas, Monaco, monospace; color: #F44336; font-weight: 500;">{line}</span>'
         elif any(word in line_lower for word in ['warn', 'warning', '⚠️']):
-            return f'<span style="color: #ffa500;">{line}</span>'
+            if not line.startswith('⚠️'):
+                line = f"⚠️ {line}"
+            return f'<span style="font-family: Consolas, Monaco, monospace; color: #FFC107; font-weight: 500;">{line}</span>'
         elif any(word in line_lower for word in ['ok:', 'completed', 'success', '✅', '✨']):
-            return f'<span style="color: #00d4aa;">{line}</span>'
+            if not line.startswith('✅') and not line.startswith('✨'):
+                line = f"✅ {line}"
+            return f'<span style="font-family: Consolas, Monaco, monospace; color: #4CAF50; font-weight: 500;">{line}</span>'
         elif line.startswith('DEBUG:'):
-            return f'<span style="color: #888888;">{line}</span>'
+            return f'<span style="font-family: Consolas, Monaco, monospace; color: #666666; font-style: italic;">{line}</span>'
         else:
-            return f'<span style="color: #ffffff;">{line}</span>'
+            return f'<span style="font-family: Consolas, Monaco, monospace; color: #ffffff;">{line}</span>'
     
     def _simplify_for_activity(self, line: str) -> str:
         """Simplify log lines for the activity stream"""
