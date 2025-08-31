@@ -512,6 +512,7 @@ class ModernStatsCard(ModernCard):
     def __init__(self, title, value="0", icon="📊", parent=None):
         super().__init__(parent=parent)
         
+        # Use parent's layout instead of creating new one
         layout = QHBoxLayout()
         layout.setContentsMargins(15, 15, 15, 15)
         
@@ -547,7 +548,8 @@ class ModernStatsCard(ModernCard):
         layout.addLayout(content_layout)
         layout.addStretch()
         
-        self.setLayout(layout)
+        # Add to parent's layout instead of replacing it
+        self.layout.addLayout(layout)
         self.setFixedHeight(80)
         
     def update_value(self, value):
@@ -558,9 +560,10 @@ class OutputFolderCard(ModernCard):
         super().__init__(parent=parent)
         self.folder_path = path
         
-        layout = QVBoxLayout()
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(8)
+        # Use parent's layout instead of creating new one
+        content_layout = QVBoxLayout()
+        content_layout.setContentsMargins(15, 15, 15, 15)
+        content_layout.setSpacing(8)
         
         # Header with icon and title
         header_layout = QHBoxLayout()
@@ -600,26 +603,13 @@ class OutputFolderCard(ModernCard):
         self.open_btn.clicked.connect(self.open_folder)
         self.open_btn.setEnabled(False)  # Disabled until path is set
         
-        layout.addLayout(header_layout)
-        layout.addWidget(self.count_label)
-        layout.addWidget(self.open_btn)
+        content_layout.addLayout(header_layout)
+        content_layout.addWidget(self.count_label)
+        content_layout.addWidget(self.open_btn)
         
-        self.setLayout(layout)
+        # Add to parent's layout instead of replacing it
+        self.layout.addLayout(content_layout)
         self.setFixedHeight(120)
-        
-        # Add hover effect
-        self.setStyleSheet("""
-            OutputFolderCard {
-                background-color: #1E1E1E;
-                border-radius: 12px;
-                border: 1px solid #2A2A2A;
-            }
-            OutputFolderCard:hover {
-                border: 1px solid #4CAF50;
-                background-color: #222222;
-                transform: translateY(-2px);
-            }
-        """)
         
     def set_path(self, path: str):
         """Set the folder path and enable the open button"""
