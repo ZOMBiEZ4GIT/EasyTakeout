@@ -1301,6 +1301,11 @@ class App(QWidget):
                 background-color: #121212;
             }
             
+            QLabel {
+                color: #ffffff;
+                background: transparent;
+            }
+            
             QLineEdit {
                 background-color: #1E1E1E;
                 border: 1px solid #2A2A2A;
@@ -1317,6 +1322,11 @@ class App(QWidget):
                 box-shadow: 0 0 8px rgba(76, 175, 80, 0.3);
             }
             
+            QLineEdit::placeholder {
+                color: #666666;
+                font-style: italic;
+            }
+            
             QTextEdit {
                 background-color: #181818;
                 border: 1px solid #2A2A2A;
@@ -1328,12 +1338,18 @@ class App(QWidget):
                 color: #ffffff;
             }
             
+            QTextEdit::placeholder {
+                color: #666666;
+                font-style: italic;
+            }
+            
             QProgressBar {
                 background-color: #333333;
                 border: none;
                 border-radius: 10px;
                 height: 8px;
                 text-align: center;
+                color: #ffffff;
             }
             
             QProgressBar::chunk {
@@ -1377,8 +1393,8 @@ class App(QWidget):
         # Animate the dropzone to show success
         self.source_dropzone.setStyleSheet("""
             ModernDropZone {
-                background-color: rgba(0, 212, 170, 0.15);
-                border: 2px solid #00d4aa;
+                background-color: rgba(76, 175, 80, 0.15);
+                border: 2px solid #4CAF50;
                 border-radius: 12px;
             }
         """)
@@ -1391,8 +1407,8 @@ class App(QWidget):
                 border-radius: 12px;
             }
             ModernDropZone:hover {
-                border-color: #00d4aa;
-                background-color: rgba(0, 212, 170, 0.05);
+                border-color: #4CAF50;
+                background-color: rgba(76, 175, 80, 0.05);
             }
         """))
         
@@ -1444,10 +1460,10 @@ class App(QWidget):
                 self.smart_feedback_label = QLabel("✅ Auto-created output structure")
                 self.smart_feedback_label.setStyleSheet("""
                     QLabel {
-                        color: #00d4aa;
+                        color: #4CAF50;
                         font-size: 12px;
                         font-weight: 600;
-                        background-color: rgba(0, 212, 170, 0.1);
+                        background-color: rgba(76, 175, 80, 0.1);
                         border-radius: 4px;
                         padding: 4px 8px;
                         margin-top: 5px;
@@ -1476,7 +1492,7 @@ class App(QWidget):
         title.setStyleSheet("""
             font-size: 28px;
             font-weight: 700;
-            color: #00d4aa;
+            color: #4CAF50;
             margin-bottom: 5px;
         """)
         
@@ -1698,7 +1714,7 @@ class App(QWidget):
         self.lbl_stage.setStyleSheet("""
             font-size: 20px;
             font-weight: 600;
-            color: #00d4aa;
+            color: #4CAF50;
             margin-bottom: 10px;
         """)
         self.lbl_stage.setAlignment(Qt.AlignCenter)
@@ -1915,9 +1931,9 @@ class App(QWidget):
             color: #aaaaaa;
             font-size: 12px;
             padding: 8px;
-            background-color: rgba(0, 212, 170, 0.05);
+            background-color: rgba(76, 175, 80, 0.05);
             border-radius: 6px;
-            border-left: 3px solid #00d4aa;
+            border-left: 3px solid #4CAF50;
         """)
         tip.setWordWrap(True)
         tip_card.layout.addWidget(tip)
@@ -2078,7 +2094,7 @@ class App(QWidget):
             QLabel {
                 font-size: 20px;
                 font-weight: 600;
-                color: #00d4aa;
+                color: #4CAF50;
                 margin-bottom: 10px;
             }
         """)
@@ -2088,26 +2104,26 @@ class App(QWidget):
         self.btn_start.setStyleSheet("""
             ModernButton {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #00d4aa, stop:1 #00b894);
+                    stop:0 #4CAF50, stop:1 #2E7D32);
                 color: white;
                 border: none;
-                border-radius: 8px;
+                border-radius: 21px;
                 font-size: 14px;
                 font-weight: 600;
                 padding: 12px 24px;
             }
             ModernButton:hover {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #00e6c0, stop:1 #00d4aa);
+                    stop:0 #66BB6A, stop:1 #4CAF50);
                 transform: translateY(-1px);
             }
             ModernButton:pressed {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #00b894, stop:1 #00a085);
+                    stop:0 #2E7D32, stop:1 #1B5E20);
             }
             ModernButton:disabled {
-                background: #555555;
-                color: #999999;
+                background: #333333;
+                color: #666666;
             }
         """)
 
@@ -2744,7 +2760,7 @@ class App(QWidget):
                 ModernButton {
                     background: transparent;
                     color: #ffffff;
-                    border: 2px solid #00d4aa;
+                    border: 2px solid #4CAF50;
                     border-radius: 8px;
                     font-size: 14px;
                     font-weight: 500;
@@ -2791,7 +2807,7 @@ def main():
         QToolTip {
             background-color: #2d2d2d;
             color: #ffffff;
-            border: 1px solid #00d4aa;
+            border: 1px solid #4CAF50;
             border-radius: 6px;
             padding: 8px;
             font-size: 12px;
@@ -2803,7 +2819,7 @@ def main():
         }
         
         QMessageBox QPushButton {
-            background-color: #00d4aa;
+            background-color: #4CAF50;
             color: white;
             border: none;
             border-radius: 6px;
