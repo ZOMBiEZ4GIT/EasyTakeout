@@ -591,6 +591,19 @@ class Orchestrator(QThread):
         src = self.source
         if not src.exists():
             raise RuntimeError("Source folder does not exist.")
+        
+        # Additional validation
+        if not src.is_dir():
+            raise RuntimeError(f"Source path is not a directory: {src}")
+        
+        # Test basic access
+        try:
+            list(src.iterdir())
+            self.log(f"DEBUG: Successfully accessed source directory contents")
+        except PermissionError as e:
+            raise RuntimeError(f"Permission denied accessing source directory: {e}")
+        except Exception as e:
+            raise RuntimeError(f"Cannot access source directory: {e}")
 
         # Pass 0: Inventory all subdirectories first
         self.log("=== STARTING COMPREHENSIVE SUBFOLDER INVENTORY ===")
@@ -603,19 +616,63 @@ class Orchestrator(QThread):
         last_ping = time.time()
         
         try:
-            for root, dirs, files in os.walk(src):
-                if self._stop: break
+            self.log(f"DEBUG: Starting directory enumeration on: {src}")
+            self.log(f"DEBUG: Source exists: {src.exists()}")
+            self.log(f"DEBUG: Source is directory: {src.is_dir()}")
+            
+            # Use iterative approach instead of os.walk to avoid hanging
+            directories_to_scan = [src]
+            scanned_count = 0
+            t0 = time.time()  # Start timing
+            
+            self.log("DEBUG: Starting iterative directory scan...")
+            
+            while directories_to_scan and not self._stop:
                 self._maybe_pause()
                 
-                root_path = Path(root)
-                all_directories.append(root_path)
+                current_dir = directories_to_scan.pop(0)
+                all_directories.append(current_dir)
                 total_dirs += 1
+                scanned_count += 1
                 
-                now = time.time()
-                if now - last_ping > 0.5:  # Update every 500ms for responsiveness
-                    rel_path = root_path.relative_to(src) if root_path != src else "."
-                    self.substage.emit(f"Found {total_dirs} directories | Current: {rel_path}")
-                    last_ping = now
+                # Log progress for first few and periodically
+                if total_dirs <= 10 or total_dirs % 100 == 0:
+                    self.log(f"DEBUG: Scanning directory #{total_dirs}: {current_dir}")
+                
+                try:
+                    # Get subdirectories with timeout protection
+                    subdirs = []
+                    for item in current_dir.iterdir():
+                        if self._stop: break
+                        if item.is_dir():
+                            subdirs.append(item)
+                            
+                    # Add subdirs to queue
+                    directories_to_scan.extend(subdirs)
+                    
+                    # Update UI more frequently for large scans
+                    now = time.time()
+                    if now - last_ping > 0.3:  # Update every 300ms
+                        rel_path = current_dir.relative_to(src) if current_dir != src else "."
+                        queue_size = len(directories_to_scan)
+                        elapsed = now - t0
+                        rate = total_dirs / max(elapsed, 1)
+                        self.substage.emit(f"Found {total_dirs} directories | Queue: {queue_size} | {rate:.1f} dirs/s | Current: {rel_path}")
+                        
+                        # Show rough progress in progress bar during scanning
+                        # Estimate progress based on queue size reduction
+                        if total_dirs > 10:
+                            estimated_progress = min(50, int((total_dirs / max(total_dirs + queue_size, 1)) * 50))
+                            self.progress.emit(estimated_progress, 100)
+                        
+                        last_ping = now
+                        
+                except PermissionError:
+                    self.log(f"DEBUG: Permission denied on: {current_dir}")
+                    continue
+                except Exception as e:
+                    self.log(f"DEBUG: Error scanning {current_dir}: {e}")
+                    continue
                     
         except PermissionError as e:
             self.log(f"WARNING: Permission denied accessing some directories: {e}")
