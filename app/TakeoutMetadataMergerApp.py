@@ -354,12 +354,12 @@ class CircularProgress(QWidget):
         self.setMinimumSize(120, 120)
         self.progress = 0
         self.text = "0%"
+        self._progress_value = 0  # Initialize this first
         
         # Animation for smooth progress updates
         self.progress_animation = QPropertyAnimation(self, b"progress_value")
         self.progress_animation.setDuration(300)
         self.progress_animation.setEasingCurve(QEasingCurve.OutCubic)
-        self._progress_value = 0
         
     # Property for animation
     def get_progress_value(self):
