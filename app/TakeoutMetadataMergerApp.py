@@ -36,6 +36,7 @@ Retry:
 """
 
 import sys, os, json, time, csv, shutil, subprocess, traceback, hashlib
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Tuple
@@ -543,6 +544,8 @@ class Orchestrator(QThread):
     def _maybe_pause(self):
         self._pause_mx.lock()
         try:
+            if self._paused:
+                self.log(f"DEBUG: _maybe_pause - paused={self._paused}, stop={self._stop}")
             while self._paused and not self._stop:
                 self._pause_cv.wait(self._pause_mx, 200)
         finally:
@@ -621,16 +624,24 @@ class Orchestrator(QThread):
             self.log(f"DEBUG: Source is directory: {src.is_dir()}")
             
             # Use iterative approach instead of os.walk to avoid hanging
+            self.log("DEBUG: Initializing directory scan variables...")
             directories_to_scan = [src]
             scanned_count = 0
             t0 = time.time()  # Start timing
             
+            self.log(f"DEBUG: Created directory queue with {len(directories_to_scan)} items")
             self.log("DEBUG: Starting iterative directory scan...")
+            self.log(f"DEBUG: About to enter while loop. _stop={self._stop}")
             
             while directories_to_scan and not self._stop:
+                self.log(f"DEBUG: Loop iteration {total_dirs + 1}, queue size: {len(directories_to_scan)}")
+                self.log("DEBUG: About to call _maybe_pause()")
                 self._maybe_pause()
                 
+                self.log("DEBUG: About to pop directory from queue")
                 current_dir = directories_to_scan.pop(0)
+                self.log(f"DEBUG: Popped directory: {current_dir}")
+                
                 all_directories.append(current_dir)
                 total_dirs += 1
                 scanned_count += 1
@@ -769,6 +780,8 @@ class Orchestrator(QThread):
                              "with_json": 0, "without_json": 0,
                              "live_pairs": 0, "total_bytes": 0}
             self.need_user_confirm.emit(self.analysis)
+            # Pause here to wait for user confirmation
+            self.toggle_pause(True)
             return
 
         # Pass 2: map sidecars with steady updates, rate, ETA using explicit directory list
@@ -867,6 +880,8 @@ class Orchestrator(QThread):
         self.progress.emit(total_media, total_media)
         self.substage.emit(f"Mapping complete: {dirs_processed} directories processed")
         self.need_user_confirm.emit(self.analysis)
+        # Pause here to wait for user confirmation before proceeding to merge stage
+        self.toggle_pause(True)
 
     # -------- Stage 2: Merge + Move --------
     def move_pair(self, media: Path, sidecar: Optional[Path], ok: bool):
@@ -1572,8 +1587,7 @@ class App(QWidget):
         self.worker.finished_files.connect(self.on_finished)
         self.worker.fatal.connect(self.on_fatal)
         self.worker.need_user_confirm.connect(self.on_plan_complete_show_dialog)
-        # Pause at the plan→merge boundary; we'll resume after user confirms
-        self.worker.toggle_pause(True)
+        # Start normally - pausing will happen automatically after planning completes
         self.worker.start()
 
     def on_pause_toggle(self):
