@@ -172,8 +172,8 @@ class ModernCard(QFrame):
         
         # Main layout
         self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(20, 15, 20, 15)
-        self.layout.setSpacing(10)
+        self.layout.setContentsMargins(5, 5, 5, 5)
+        self.layout.setSpacing(5)
         
         if title:
             self.title_label = QLabel(title)
@@ -514,7 +514,7 @@ class ModernStatsCard(ModernCard):
         
         # Use parent's layout instead of creating new one
         layout = QHBoxLayout()
-        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setContentsMargins(12, 10, 12, 10)
         
         # Icon
         icon_label = QLabel(icon)
@@ -550,7 +550,7 @@ class ModernStatsCard(ModernCard):
         
         # Add to parent's layout instead of replacing it
         self.layout.addLayout(layout)
-        self.setFixedHeight(80)
+        self.setFixedHeight(95)
         
     def update_value(self, value):
         self.value_label.setText(str(value))
@@ -562,8 +562,8 @@ class OutputFolderCard(ModernCard):
         
         # Use parent's layout instead of creating new one
         content_layout = QVBoxLayout()
-        content_layout.setContentsMargins(15, 15, 15, 15)
-        content_layout.setSpacing(8)
+        content_layout.setContentsMargins(12, 10, 12, 10)
+        content_layout.setSpacing(6)
         
         # Header with icon and title
         header_layout = QHBoxLayout()
@@ -609,7 +609,7 @@ class OutputFolderCard(ModernCard):
         
         # Add to parent's layout instead of replacing it
         self.layout.addLayout(content_layout)
-        self.setFixedHeight(120)
+        self.setFixedHeight(140)
         
     def set_path(self, path: str):
         """Set the folder path and enable the open button"""
